@@ -730,7 +730,7 @@ public:
       
       float frame = 1.0f;
       
-      // figure out frame value from options
+      // Figure out frame default value from options node
       AtNode *opts = AiUniverseGetOptions();
       const AtUserParamEntry *param = AiNodeLookUpUserParameter(opts, "frame");
       if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
@@ -755,6 +755,7 @@ public:
          }
       }
       
+      // Read params from string data
       size_t p0;
       size_t p1;
       size_t p2;
@@ -970,8 +971,96 @@ public:
          }
       }
       
+      // Read params from user attributes
+      param = AiNodeLookUpUserParameter(node, "file");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_STRING)
+      {
+         mPath = AiNodeGetStr(node, "file");
+      }
+      
+      param = AiNodeLookUpUserParameter(node, "partition");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_STRING)
+      {
+         mPartition = AiNodeGetStr(node, "partition");
+      }
+      
+      param = AiNodeLookUpUserParameter(node, "merge");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_ARRAY && AiUserParamGetArrayType(param) == AI_TYPE_STRING)
+      {
+         AtArray *ary = AiNodeGetArray(node, "merge");
+         
+         for (unsigned int i=0; i<ary->nelements; ++i)
+         {
+            std::string md = AiArrayGetStr(ary, i);
+            
+            size_t p0 = md.find('=');
+            
+            if (p0 != std::string::npos)
+            {
+               std::string channel = md.substr(0, p0);
+               std::string mtype = md.substr(p0 + 1);
+               
+               if (mtype == "avg")
+               {
+                  mChannelsMergeType[channel] = SMT_avg;
+                  AiMsgDebug("[f3d] Using AVG merge for channel \"%s\"", channel.c_str());
+               }
+               else if (mtype == "add")
+               {
+                  mChannelsMergeType[channel] = SMT_add;
+                  AiMsgDebug("[f3d] Using ADD merge for channel \"%s\"", channel.c_str());
+               }
+               else if (mtype == "max")
+               {
+                  mChannelsMergeType[channel] = SMT_max;
+                  AiMsgDebug("[f3d] Using MAX merge for channel \"%s\"", channel.c_str());
+               }
+               else if (mtype == "min")
+               {
+                  mChannelsMergeType[channel] = SMT_min;
+                  AiMsgDebug("[f3d] Using MIN merge for channel \"%s\"", channel.c_str());
+               }
+            }
+         }
+      }
+      
+      param = AiNodeLookUpUserParameter(node, "frame");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
+      {
+         int ptype = AiUserParamGetType(param);
+         switch (ptype)
+         {
+         case AI_TYPE_BYTE:
+            frame = float(AiNodeGetByte(node, "frame"));
+            break;
+         case AI_TYPE_INT:
+            frame = float(AiNodeGetInt(node, "frame"));
+            break;
+         case AI_TYPE_UINT:
+            frame = float(AiNodeGetUInt(node, "frame"));
+            break;
+         case AI_TYPE_FLOAT:
+            frame = AiNodeGetFlt(node, "frame");
+            break;
+         default:
+            break;
+         }
+      }
+      
+      param = AiNodeLookUpUserParameter(node, "ignoreXform");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
+      {
+         mIgnoreTransform = AiNodeGetBool(node, "ignoreXform");
+      }
+      
+      param = AiNodeLookUpUserParameter(node, "verbose");
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
+      {
+         mVerbose = AiNodeGetBool(node, "verbose");
+      }
+      
       // Replace frame in path (if necessary)
-      // allow ###, %03d, or yet <frame> token in file path
+      // allow ###, %03d, or yet <frame> and <frame:pad> tokens in file path
       int iframe = int(floorf(frame));
       
       p0 = mPath.find_last_of("\\/");
