@@ -44,7 +44,7 @@ if field3d_static:
 if sys.platform == "win32":
   defs.append("NO_TTY")
 
-customs = [hdf5.Require(hl=False),
+customs = [hdf5.Require(hl=False, verbose=True),
            ilmbase.Require(ilmthread=False, iexmath=False),
            boost.Require(libs=["system", "regex"]),
            arnold.Require]
@@ -68,7 +68,7 @@ if not test:
   target["ext"] = arnold.PluginExt()
 
 env = excons.MakeBaseEnv()
-env.Append(CPPFLAGS=" -Wno-unused-parameter")
+
 excons.DeclareTargets(env, [target])
 
 Default(["arnold"])
