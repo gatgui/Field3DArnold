@@ -133,7 +133,7 @@ struct SampleField
 {
    typedef typename FieldType::value_type ValueType;
    
-   static bool Sample(typename FieldType::Ptr field, const Field3D::V3d &P,
+   static bool Sample(FieldType &field, const Field3D::V3d &P,
                       int interp, SampleMergeType mergeType,
                       AtParamValue *outValue, AtByte *outType)
    {
@@ -151,13 +151,13 @@ struct SampleField
       case AI_VOLUME_INTERP_TRILINEAR:
          {
             typename FieldType::LinearInterp interpolator;
-            val = interpolator.sample(*field, P);
+            val = interpolator.sample(field, P);
          }
          break;
       case AI_VOLUME_INTERP_TRICUBIC:
          {
             typename FieldType::CubicInterp interpolator;
-            val = interpolator.sample(*field, P);
+            val = interpolator.sample(field, P);
          }
          break;
       case AI_VOLUME_INTERP_CLOSEST:
@@ -171,7 +171,7 @@ struct SampleField
             int vy = int(floor(Pc.y));
             int vz = int(floor(Pc.z));
             
-            val = field->fastValue(vx, vy, vz);
+            val = field.fastValue(vx, vy, vz);
          }
       }
       
@@ -193,7 +193,7 @@ struct SampleField<Field3D::MACField<FIELD3D_VEC3_T<DataType> > >
    typedef FIELD3D_VEC3_T<DataType> ValueType;
    typedef Field3D::MACField<ValueType> FieldType;
    
-   static bool Sample(typename FieldType::Ptr field, const Field3D::V3d &P,
+   static bool Sample(FieldType &field, const Field3D::V3d &P,
                       int interp, SampleMergeType mergeType,
                       AtParamValue *outValue, AtByte *outType)
    {
@@ -211,13 +211,13 @@ struct SampleField<Field3D::MACField<FIELD3D_VEC3_T<DataType> > >
       case AI_VOLUME_INTERP_TRILINEAR:
          {
             typename FieldType::LinearInterp interpolator;
-            val = interpolator.sample(*field, P);
+            val = interpolator.sample(field, P);
          }
          break;
       case AI_VOLUME_INTERP_TRICUBIC:
          {
             typename FieldType::CubicInterp interpolator;
-            val = interpolator.sample(*field, P);
+            val = interpolator.sample(field, P);
          }
          break;
       case AI_VOLUME_INTERP_CLOSEST:
@@ -231,9 +231,9 @@ struct SampleField<Field3D::MACField<FIELD3D_VEC3_T<DataType> > >
             int vy = int(floor(Pc.y));
             int vz = int(floor(Pc.z));
             
-            val.x = field->uCenter(vx, vy, vz);
-            val.y = field->vCenter(vx, vy, vz);
-            val.z = field->wCenter(vx, vy, vz);
+            val.x = field.uCenter(vx, vy, vz);
+            val.y = field.vCenter(vx, vy, vz);
+            val.z = field.wCenter(vx, vy, vz);
          }
       }
       
@@ -564,7 +564,7 @@ struct FieldData
       return true;
    }
    
-   bool sample(const Field3D::V3d P, int interp, SampleMergeType mergeType, AtParamValue *outValue, AtByte *outType)
+   bool sample(const Field3D::V3d &P, int interp, SampleMergeType mergeType, AtParamValue *outValue, AtByte *outType)
    {
       bool rv = false;
       
@@ -574,16 +574,16 @@ struct FieldData
          switch (dataType)
          {
          case FDT_half:
-            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3h> >::Sample(vector.sparseh, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::SparseField<Field3D::half> >::Sample(scalar.sparseh, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3h> >::Sample(*vector.sparseh, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::SparseField<Field3D::half> >::Sample(*scalar.sparseh, P, interp, mergeType, outValue, outType));
             break;
          case FDT_float:
-            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3f> >::Sample(vector.sparsef, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::SparseField<float> >::Sample(scalar.sparsef, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3f> >::Sample(*vector.sparsef, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::SparseField<float> >::Sample(*scalar.sparsef, P, interp, mergeType, outValue, outType));
             break;
          case FDT_double:
-            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3d> >::Sample(vector.sparsed, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::SparseField<double> >::Sample(scalar.sparsed, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::SparseField<Field3D::V3d> >::Sample(*vector.sparsed, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::SparseField<double> >::Sample(*scalar.sparsed, P, interp, mergeType, outValue, outType));
          default:
             break;
          }
@@ -592,16 +592,16 @@ struct FieldData
          switch (dataType)
          {
          case FDT_half:
-            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3h> >::Sample(vector.denseh, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::DenseField<Field3D::half> >::Sample(scalar.denseh, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3h> >::Sample(*vector.denseh, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::DenseField<Field3D::half> >::Sample(*scalar.denseh, P, interp, mergeType, outValue, outType));
             break;
          case FDT_float:
-            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3f> >::Sample(vector.densef, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::DenseField<float> >::Sample(scalar.densef, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3f> >::Sample(*vector.densef, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::DenseField<float> >::Sample(*scalar.densef, P, interp, mergeType, outValue, outType));
             break;
          case FDT_double:
-            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3d> >::Sample(vector.densed, P, interp, mergeType, outValue, outType)
-                           : SampleField<Field3D::DenseField<double> >::Sample(scalar.densed, P, interp, mergeType, outValue, outType));
+            rv = (isVector ? SampleField<Field3D::DenseField<Field3D::V3d> >::Sample(*vector.densed, P, interp, mergeType, outValue, outType)
+                           : SampleField<Field3D::DenseField<double> >::Sample(*scalar.densed, P, interp, mergeType, outValue, outType));
          default:
             break;
          }
@@ -612,13 +612,13 @@ struct FieldData
             switch (dataType)
             {
             case FDT_half:
-               rv = SampleField<Field3D::MACField<Field3D::V3h> >::Sample(vector.mach, P, interp, mergeType, outValue, outType);
+               rv = SampleField<Field3D::MACField<Field3D::V3h> >::Sample(*vector.mach, P, interp, mergeType, outValue, outType);
                break;
             case FDT_float:
-               rv = SampleField<Field3D::MACField<Field3D::V3f> >::Sample(vector.macf, P, interp, mergeType, outValue, outType);
+               rv = SampleField<Field3D::MACField<Field3D::V3f> >::Sample(*vector.macf, P, interp, mergeType, outValue, outType);
                break;
             case FDT_double:
-               rv = SampleField<Field3D::MACField<Field3D::V3d> >::Sample(vector.macd, P, interp, mergeType, outValue, outType);
+               rv = SampleField<Field3D::MACField<Field3D::V3d> >::Sample(*vector.macd, P, interp, mergeType, outValue, outType);
             default:
                break;
             }
