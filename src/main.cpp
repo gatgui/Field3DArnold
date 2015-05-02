@@ -2,6 +2,9 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
+#include <map>
+#include <vector>
+#include <deque>
 #include <Field3D/InitIO.h>
 #include <Field3D/FieldIO.h>
 #include <Field3D/Field3DFile.h>
@@ -279,12 +282,10 @@ struct VectorFieldData
 
 struct FieldData
 {
-   // empty field type doesn't matter much
-   Field3D::EmptyField<float>::Ptr proxy;
-   
    std::string partition;
    std::string name;
-   size_t index;
+   size_t globalIndex;
+   size_t partitionIndex;
    
    Field3D::FieldRes::Ptr base;
    
@@ -296,270 +297,171 @@ struct FieldData
    VectorFieldData vector;
    
    
-   bool setup(Field3D::Field3DInputFile *file)
+   bool setup(Field3D::FieldRes::Ptr baseField, FieldDataType dt, bool vec)
    {
-      if (!file)
-      {
-         return false;
-      }
+      type = FT_unknown;
+      dataType = FDT_unknown;
+      isVector = false;
+      base = 0;
       
-      bool found = false;
-      
-      if (isVector)
+      if (vec)
       {
-         if (!found)
+         switch (dt)
          {
-            Field3D::Field<Field3D::V3h>::Vec ll = file->readVectorLayers<Field3D::half>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+         case FDT_half:
+            vector.sparseh = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3h> >(baseField);
+            if (!vector.sparseh)
             {
-               dataType = FDT_half;
-               base = ll[index];
-               
-               vector.sparseh = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3h> >(base);
-               if (!vector.sparseh)
+               vector.denseh = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3h> >(baseField);
+               if (!vector.denseh)
                {
-                  vector.denseh = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3h> >(base);
-                  if (!vector.denseh)
+                  vector.mach = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3h> >(baseField);
+                  if (!vector.mach)
                   {
-                     vector.mach = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3h> >(base);
-                     if (vector.mach)
-                     {
-                        type = FT_mac;
-                        found = true;
-                     }
+                     return false;
                   }
                   else
                   {
-                     type = FT_dense;
-                     found = true;
+                     type = FT_mac;
                   }
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
-         }
-         
-         if (!found)
-         {
-            Field3D::Field<Field3D::V3f>::Vec ll = file->readVectorLayers<float>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+            else
             {
-               dataType = FDT_float;
-               base = ll[index];
-               
-               vector.sparsef = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3f> >(base);
-               if (!vector.sparsef)
+               type = FT_sparse;
+            }
+            break;
+         case FDT_float:
+            vector.sparsef = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3f> >(baseField);
+            if (!vector.sparsef)
+            {
+               vector.densef = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3f> >(baseField);
+               if (!vector.densef)
                {
-                  vector.densef = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3f> >(base);
-                  if (!vector.densef)
+                  vector.macf = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3f> >(baseField);
+                  if (!vector.macf)
                   {
-                     vector.macf = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3f> >(base);
-                     if (vector.macf)
-                     {
-                        type = FT_mac;
-                        found = true;
-                     }
+                     return false;
                   }
                   else
                   {
-                     type = FT_dense;
-                     found = true;
+                     type = FT_mac;
                   }
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
-         }
-         
-         if (!found)
-         {
-            Field3D::Field<Field3D::V3d>::Vec ll = file->readVectorLayers<double>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+            else
             {
-               dataType = FDT_double;
-               base = ll[index];
-               
-               vector.sparsed = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3d> >(base);
-               if (!vector.sparsed)
+               type = FT_sparse;
+            }
+            break;
+         case FDT_double:
+            vector.sparsed = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::V3d> >(baseField);
+            if (!vector.sparsed)
+            {
+               vector.densed = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3d> >(baseField);
+               if (!vector.densed)
                {
-                  vector.densed = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::V3d> >(base);
-                  if (!vector.densed)
+                  vector.macd = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3d> >(baseField);
+                  if (!vector.macd)
                   {
-                     vector.macd = Field3D::field_dynamic_cast<Field3D::MACField<Field3D::V3d> >(base);
-                     if (vector.macd)
-                     {
-                        type = FT_mac;
-                        found = true;
-                     }
+                     return false;
                   }
                   else
                   {
-                     type = FT_dense;
-                     found = true;
+                     type = FT_mac;
                   }
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
+            else
+            {
+               type = FT_sparse;
+            }
+            break;
+         default:
+            return false;
          }
       }
       else
       {
-         if (!found)
+         switch (dt)
          {
-            Field3D::Field<Field3D::half>::Vec ll = file->readScalarLayers<Field3D::half>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+         case FDT_half:
+            scalar.sparseh = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::half> >(baseField);
+            if (!scalar.sparseh)
             {
-               dataType = FDT_half;
-               base = ll[index];
-               
-               scalar.sparseh = Field3D::field_dynamic_cast<Field3D::SparseField<Field3D::half> >(base);
-               if (!scalar.sparseh)
+               scalar.denseh = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::half> >(baseField);
+               if (!scalar.denseh)
                {
-                  scalar.denseh = Field3D::field_dynamic_cast<Field3D::DenseField<Field3D::half> >(base);
-                  if (scalar.denseh)
-                  {
-                     type = FT_dense;
-                     found = true;
-                  }
+                  return false;
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
-         }
-         
-         if (!found)
-         {
-            Field3D::Field<float>::Vec ll = file->readScalarLayers<float>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+            else
             {
-               dataType = FDT_float;
-               base = ll[index];
-               
-               scalar.sparsef = Field3D::field_dynamic_cast<Field3D::SparseField<float> >(base);
-               if (!scalar.sparsef)
+               type = FT_sparse;
+            }
+            break;
+         case FDT_float:
+            scalar.sparsef = Field3D::field_dynamic_cast<Field3D::SparseField<float> >(baseField);
+            if (!scalar.sparsef)
+            {
+               scalar.densef = Field3D::field_dynamic_cast<Field3D::DenseField<float> >(baseField);
+               if (!scalar.densef)
                {
-                  scalar.densef = Field3D::field_dynamic_cast<Field3D::DenseField<float> >(base);
-                  if (scalar.densef)
-                  {
-                     type = FT_dense;
-                     found = true;
-                  }
+                  return false;
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
-         }
-         
-         if (!found)
-         {
-            Field3D::Field<double>::Vec ll = file->readScalarLayers<double>(partition, name);
-            
-            if (!ll.empty() && index < ll.size())
+            else
             {
-               dataType = FDT_double;
-               base = ll[index];
-               
-               scalar.sparsed = Field3D::field_dynamic_cast<Field3D::SparseField<double> >(base);
-               if (!scalar.sparsed)
+               type = FT_sparse;
+            }
+            break;
+         case FDT_double:
+            scalar.sparsed = Field3D::field_dynamic_cast<Field3D::SparseField<double> >(baseField);
+            if (!scalar.sparsed)
+            {
+               scalar.densed = Field3D::field_dynamic_cast<Field3D::DenseField<double> >(baseField);
+               if (!scalar.densed)
                {
-                  scalar.densed = Field3D::field_dynamic_cast<Field3D::DenseField<double> >(base);
-                  if (scalar.densed)
-                  {
-                     type = FT_dense;
-                     found = true;
-                  }
+                  return false;
                }
                else
                {
-                  type = FT_sparse;
-                  found = true;
+                  type = FT_dense;
                }
             }
-         }
-      }
-      
-      if (!found)
-      {
-         base = 0;
-         dataType = FDT_unknown;
-         return false;
-      }
-      else
-      {
-         return true;
-      }
-   }
-   
-   bool isIdentical(const FieldData &rhs) const
-   {
-      if (partition != rhs.partition)
-      {
-         return false;
-      }
-      
-      if (name != rhs.name)
-      {
-         return false;
-      }
-      
-      if (index != rhs.index)
-      {
-         return false;
-      }
-      
-      if (dataType != rhs.dataType)
-      {
-         return false;
-      }
-      
-      if (type != rhs.type)
-      {
-         return false;
-      }
-      
-      if (isVector != rhs.isVector)
-      {
-         return false;
-      }
-      
-      if (base && rhs.base)
-      {
-         if (base->extents() != rhs.base->extents())
-         {
-            return false;
-         }
-         
-         if (base->dataWindow() != rhs.base->dataWindow())
-         {
-            return false;
-         }
-         
-         if (!base->mapping()->isIdentical(rhs.base->mapping()))
-         {
+            else
+            {
+               type = FT_sparse;
+            }
+            break;
+         default:
             return false;
          }
       }
+      
+      base = baseField;
+      isVector = vec;
+      dataType = dt;
       
       return true;
    }
@@ -651,10 +553,13 @@ public:
    void reset()
    {
       mNode = 0;
+      mPath = "";
       mPartition = "";
       mIgnoreTransform = false;
+      mVerbose = false;
       
       mFields.clear();
+      mFieldIndices.clear();
       
       if (mF3DFile)
       {
@@ -670,56 +575,19 @@ public:
          return false;
       }
       
-      // don't check mPartition directly
-      
-      PartitionFieldMap::const_iterator pit0 = mFields.begin();
-      PartitionFieldMap::const_iterator pit1 = rhs.mFields.begin();
-      
-      while (pit0 != mFields.end())
+      if (mPartition != rhs.mPartition)
       {
-         if (pit1 == rhs.mFields.end())
-         {
-            // not the same number of partitions
-            return false;
-         }
-         
-         FieldMap::const_iterator fit0 = pit0->second.begin();
-         FieldMap::const_iterator fit1 = pit1->second.begin();
-         
-         while (fit0 != pit0->second.end())
-         {
-            if (fit1 == pit1->second.end())
-            {
-               // not the same number of fields in partition
-               return false;
-            }
-            
-            if (!fit0->second.isIdentical(fit1->second))
-            {
-               return false;
-            }
-            
-            ++fit0;
-            ++fit1;
-         }
-         
-         if (fit1 != pit1->second.end())
-         {
-            // not the same number of fields in partition
-            return false;
-         }
-         
-         ++pit0;
-         ++pit1;
-      }
-      
-      if (pit1 != rhs.mFields.end())
-      {
-         // not the same number of partitions
          return false;
       }
       
-      // mIgnoreTransform doesn't influence the fields to be read
+      // No influence the fields to be read
+      //   mIgnoreTransform 
+      //   mVerbose
+      //   mChannelsMergeType
+      //
+      // Derived from mPath and mPartition
+      //   mFields
+      //   mFieldIndices
       
       return true;
    }
@@ -775,8 +643,6 @@ public:
          {
             std::string flag = paramString.substr(p1, p2 - p1);
             std::string arg;
-            
-            AiMsgDebug("[f3d] Flag \"%s\"", flag.c_str());
             
             if (flag != "-ignoreXform" && flag != "-verbose")
             {
@@ -834,8 +700,6 @@ public:
                   
                   arg = paramString.substr(p3 + off, p4 - p3 - off);
                }
-               
-               AiMsgDebug("[f3d] %s = \"%s\"", flag.substr(1).c_str(), arg.c_str());
                
                if (flag == "-file")
                {
@@ -914,16 +778,12 @@ public:
                mIgnoreTransform = true;
                
                p0 = p2 + 1;
-               
-               AiMsgDebug("[f3d] ignoreTransform = true");
             }
             else if (flag == "-verbose")
             {
                mVerbose = true;
                
                p0 = p2 + 1;
-               
-               AiMsgDebug("[f3d] verbose = true");
             }
             else
             {
@@ -1148,11 +1008,6 @@ public:
          }
       }
       
-      if (foundFramePattern)
-      {
-         AiMsgDebug("[f3d] Replaced pattern in basename: %s", basename.c_str());
-      }
-      
       sprintf(tmp, basename.c_str(), iframe);
          
       if (basename == tmp)
@@ -1173,7 +1028,10 @@ public:
       }
       mPath += basename;
       
-      AiMsgDebug("[f3d] Using %s", mPath.c_str());
+      if (mVerbose)
+      {
+         AiMsgInfo("[f3d] Using %s", mPath.c_str());
+      }
       
       if (!noSetup)
       {
@@ -1185,9 +1043,73 @@ public:
       }
    }
    
+   //addFields(partition, layer, FDT_half, false, hfields, pfcit->second, gfcit->second);
+   template <typename DataType>
+   void addFields(const std::string &partition, const std::string &layer,
+                  FieldDataType dataType, bool isVector,
+                  typename Field3D::Field<DataType>::Vec &fields, 
+                  size_t &partitionFieldCount, size_t &globalFieldCount)
+   {
+      size_t maxlen = partition.length() + layer.length() + 32;
+      char *tmp = (char*) AiMalloc(maxlen * sizeof(char));
+      
+      for (size_t i=0; i<fields.size(); ++i)
+      {
+         FieldData fd;
+         
+         fd.partition = partition;
+         fd.name = layer;
+         
+         if (!fd.setup(fields[i], dataType, isVector))
+         {
+            continue;
+         }
+         
+         fd.partitionIndex = partitionFieldCount++;
+         fd.globalIndex = globalFieldCount++;
+         
+         if (mVerbose)
+         {
+            AiMsgInfo("[f3d] Add %s channel '%s.%s[%lu]'", isVector ? "vector" : "scalar", partition.c_str(), layer.c_str(), fd.partitionIndex);
+            AiMsgInfo("[f3d]   also accessible as: '%s.%s', '%s[%lu]' and '%s'", partition.c_str(), layer.c_str(), layer.c_str(), fd.globalIndex, layer.c_str());
+         }
+         
+         { // partition.field[index]
+            sprintf(tmp, "%s.%s[%lu]", partition.c_str(), layer.c_str(), fd.partitionIndex);
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // partition.field
+            sprintf(tmp, "%s.%s", partition.c_str(), layer.c_str());
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // field[index]
+            sprintf(tmp, "%s[%lu]", layer.c_str(), fd.globalIndex);
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // field
+            sprintf(tmp, "%s", layer.c_str());
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         mFields.push_back(fd);
+      }
+      
+      AiFree(tmp);
+   }
+   
    bool setup()
    {
-      AiMsgDebug("[f3d] Open file: %s", mPath.c_str());
+      if (mVerbose)
+      {
+         AiMsgInfo("[f3d] Open file: %s", mPath.c_str());
+      }
       
       mF3DFile = new Field3D::Field3DInputFile();
       
@@ -1200,8 +1122,10 @@ public:
       {
          std::vector<std::string> partitions;
          std::vector<std::string> layers;
-         Field3D::EmptyField<float>::Vec fields;
-         FieldMap::iterator fit;
+         std::map<std::string, size_t> fieldCount;
+         std::map<std::string, std::map<std::string, size_t> > partitionsFieldCount;
+         std::map<std::string, size_t>::iterator pfcit;
+         std::map<std::string, size_t>::iterator gfcit;
          
          if (mPartition.length() > 0)
          {
@@ -1209,6 +1133,7 @@ public:
          }
          else
          {
+            // Note: partition names are made unique by 'getPartitionNames'
             mF3DFile->getPartitionNames(partitions);
          }
          
@@ -1216,9 +1141,7 @@ public:
          {
             const std::string &partition = partitions[i];
             
-            AiMsgDebug("[f3d] Found partition \"%s\"", partition.c_str());
-            
-            FieldMap &partitionFields = mFields[partition];
+            std::map<std::string, size_t> &partitionFieldCount = partitionsFieldCount[partition];
             
             layers.clear();   
             mF3DFile->getScalarLayerNames(layers, partition);
@@ -1227,67 +1150,32 @@ public:
             {
                const std::string &layer = layers[j];
                
-               AiMsgDebug("[f3d] Found scalar layer \"%s\"", layer.c_str());
+               Field3D::Field<Field3D::half>::Vec hfields = mF3DFile->readScalarLayers<Field3D::half>(partition, layer);
+               Field3D::Field<float>::Vec ffields = mF3DFile->readScalarLayers<float>(partition, layer);
+               Field3D::Field<double>::Vec dfields = mF3DFile->readScalarLayers<double>(partition, layer);
                
-               fields = mF3DFile->readProxyLayer<float>(partition, layer, false);
-               
-               if (fields.empty())
+               if (hfields.empty() && ffields.empty() && dfields.empty())
                {
                   continue;
                }
-               else if (fields.size() == 1)
+               
+               gfcit = fieldCount.find(layer);
+               if (gfcit == fieldCount.end())
                {
-                  fit = partitionFields.find(layer);
-                  if (fit == partitionFields.end())
-                  {
-                     FieldData &pfield = partitionFields[layer];
-                     
-                     pfield.type = FT_unknown;
-                     pfield.dataType = FDT_unknown;
-                     pfield.proxy = fields[0];
-                     pfield.isVector = false;
-                     pfield.partition = partition;
-                     pfield.name = layer;
-                     pfield.index = 0;
-                     
-                     AiMsgDebug("[f3d] Add channel %s.%s", partition.c_str(), layer.c_str());
-                  }
-                  else
-                  {
-                     AiMsgWarning("[f3d] Scalar channel with name \"%s\" already exists for partition \"%s\"", layer.c_str(), partition.c_str());
-                  }
+                  fieldCount[layer] = 0;
+                  gfcit = fieldCount.find(layer);
                }
-               else
+               
+               pfcit = partitionFieldCount.find(layer);
+               if (pfcit == partitionFieldCount.end())
                {
-                  char *tmp = new char[layer.length() + 32];
-                  
-                  for (size_t k=0; k<fields.size(); ++k)
-                  {
-                     sprintf(tmp, "%s[%lu]", layer.c_str(), k);
-                     
-                     fit = partitionFields.find(tmp);
-                     if (fit == partitionFields.end())
-                     {
-                        FieldData &pfield = partitionFields[tmp];
-                        
-                        pfield.type = FT_unknown;
-                        pfield.dataType = FDT_unknown;
-                        pfield.proxy = fields[k];
-                        pfield.isVector = false;
-                        pfield.partition = partition;
-                        pfield.name = layer;
-                        pfield.index = k;
-                        
-                        AiMsgDebug("[f3d] Add channel %s.%s[%lu]", partition.c_str(), layer.c_str(), k);
-                     }
-                     else
-                     {
-                        AiMsgWarning("[f3d] Scalar channel with name \"%s\" already exists for partition \"%s\"", tmp, partition.c_str());
-                     }
-                  }
-                  
-                  delete[] tmp;
+                  partitionFieldCount[layer] = 0;
+                  pfcit = partitionFieldCount.find(layer);
                }
+               
+               addFields<Field3D::half>(partition, layer, FDT_half, false, hfields, pfcit->second, gfcit->second);
+               addFields<float>(partition, layer, FDT_float, false, ffields, pfcit->second, gfcit->second);
+               addFields<double>(partition, layer, FDT_double, false, dfields, pfcit->second, gfcit->second);
             }
             
             layers.clear();
@@ -1297,67 +1185,32 @@ public:
             {
                const std::string &layer = layers[j];
                
-               AiMsgDebug("[f3d] Found vector layer \"%s\"", layer.c_str());
+               Field3D::Field<Field3D::V3h>::Vec hfields = mF3DFile->readVectorLayers<Field3D::half>(partition, layer);
+               Field3D::Field<Field3D::V3f>::Vec ffields = mF3DFile->readVectorLayers<float>(partition, layer);
+               Field3D::Field<Field3D::V3d>::Vec dfields = mF3DFile->readVectorLayers<double>(partition, layer);
                
-               fields = mF3DFile->readProxyLayer<float>(partition, layer, true);
-               
-               if (fields.empty())
+               if (hfields.empty() && ffields.empty() && dfields.empty())
                {
                   continue;
                }
-               else if (fields.size() == 1)
+               
+               gfcit = fieldCount.find(layer);
+               if (gfcit == fieldCount.end())
                {
-                  fit = partitionFields.find(layer);
-                  if (fit == partitionFields.end())
-                  {
-                     FieldData &pfield = partitionFields[layer];
-                     
-                     pfield.type = FT_unknown;
-                     pfield.dataType = FDT_unknown;
-                     pfield.proxy = fields[0];
-                     pfield.isVector = true;
-                     pfield.partition = partition;
-                     pfield.name = layer;
-                     pfield.index = 0;
-                     
-                     AiMsgDebug("[f3d] Add channel %s.%s", partition.c_str(), layer.c_str());
-                  }
-                  else
-                  {
-                     AiMsgWarning("[f3d] Vector channel with name \"%s\" already exists for partition \"%s\"", layer.c_str(), partition.c_str());
-                  }
+                  fieldCount[layer] = 0;
+                  gfcit = fieldCount.find(layer);
                }
-               else
+               
+               pfcit = partitionFieldCount.find(layer);
+               if (pfcit == partitionFieldCount.end())
                {
-                  char *tmp = new char[layer.length() + 32];
-                  
-                  for (size_t k=0; k<fields.size(); ++k)
-                  {
-                     sprintf(tmp, "%s[%lu]", layer.c_str(), k);
-                     
-                     fit = partitionFields.find(tmp);
-                     if (fit == partitionFields.end())
-                     {
-                        FieldData &pfield = partitionFields[tmp];
-                        
-                        pfield.type = FT_unknown;
-                        pfield.dataType = FDT_unknown;
-                        pfield.proxy = fields[k];
-                        pfield.isVector = true;
-                        pfield.partition = partition;
-                        pfield.name = layer;
-                        pfield.index = k;
-                        
-                        AiMsgDebug("[f3d] Add channel %s.%s[%lu]", partition.c_str(), layer.c_str(), k);
-                     }
-                     else
-                     {
-                        AiMsgWarning("[f3d] Vector channel with name \"%s\" already exists for partition \"%s\"", tmp, partition.c_str());
-                     }
-                  }
-                  
-                  delete[] tmp;
+                  partitionFieldCount[layer] = 0;
+                  pfcit = partitionFieldCount.find(layer);
                }
+               
+               addFields<Field3D::V3h>(partition, layer, FDT_half, true, hfields, pfcit->second, gfcit->second);
+               addFields<Field3D::V3f>(partition, layer, FDT_float, true, ffields, pfcit->second, gfcit->second);
+               addFields<Field3D::V3d>(partition, layer, FDT_double, true, dfields, pfcit->second, gfcit->second);
             }
          }
          
@@ -1370,33 +1223,52 @@ public:
       // do not reset if using same file and same fields (same partition)
       // ignore transform and verbose are
       VolumeData tmp;
+      bool rv = false;
       
-      if (tmp.init(node, paramString))
+      if (tmp.init(node, paramString, true))
       {
          if (isIdentical(tmp))
          {
+            if (mVerbose)
+            {
+               AiMsgInfo("[f3d] No changes in fields to be read");
+            }
+            
             mNode = node;
-            mPartition = tmp.mPartition;
             mIgnoreTransform = tmp.mIgnoreTransform;
             mVerbose = tmp.mVerbose;
+            std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
+            
+            rv = true;
          }
          else
          {
-            std::swap(mNode, tmp.mNode);
-            std::swap(mF3DFile, tmp.mF3DFile);
-            std::swap(mPath, tmp.mPath);
-            std::swap(mPartition, tmp.mPartition);
-            std::swap(mIgnoreTransform, tmp.mIgnoreTransform);
-            std::swap(mVerbose, tmp.mVerbose);
-            std::swap(mFields, tmp.mFields);
+            if (tmp.setup())
+            {
+               std::swap(mNode, tmp.mNode);
+               std::swap(mF3DFile, tmp.mF3DFile);
+               std::swap(mPath, tmp.mPath);
+               std::swap(mPartition, tmp.mPartition);
+               std::swap(mIgnoreTransform, tmp.mIgnoreTransform);
+               std::swap(mVerbose, tmp.mVerbose);
+               std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
+               std::swap(mFieldIndices, tmp.mFieldIndices);
+               std::swap(mFields, tmp.mFields);
+               
+               rv = true;
+            }
+            else
+            {
+               reset();
+            }
          }
-         
-         return true;
       }
       else
       {
-         return false;
+         reset();
       }
+      
+      return rv;
    }
    
    void computeBounds(AtBBox &outBox, float &autoStep)
@@ -1409,62 +1281,61 @@ public:
       
       float autoStepNormalize = 0.0;
       
-      for (PartitionFieldMap::const_iterator pit = mFields.begin(); pit != mFields.end(); ++pit)
+      for (size_t i=0; i<mFields.size(); ++i)
       {
-         for (FieldMap::const_iterator fit = pit->second.begin(); fit != pit->second.end(); ++fit)
+         FieldData &fd = mFields[i];
+         
+         if (!fd.base)
          {
-            if (!fit->second.proxy)
-            {
-               continue;
-            }
-            
-            Field3D::V3i res = fit->second.proxy->dataResolution();
-            
-            Field3D::V3d bmin(0.0, 0.0, 0.0);
-            Field3D::V3d bmax(1.0, 1.0, 1.0);
-            Field3D::V3d lstep(1.0 / double(res.x),
-                               1.0 / double(res.y),
-                               1.0 / double(res.z));
-            Field3D::V3d step;
-            Field3D::Box3d b;
-            
-            if (!mIgnoreTransform)
-            {
-               fit->second.proxy->mapping()->localToWorld(bmin, b.min);
-               fit->second.proxy->mapping()->localToWorld(bmax, b.max);
-               
-               // Note: b.min is the origin (0, 0, 0) in world space
-               //       localToWorld is transforming its input as a point, not a vector
-               fit->second.proxy->mapping()->localToWorld(lstep, step);
-               
-               step.x = fabs(step.x - b.min.x);
-               step.y = fabs(step.y - b.min.y);
-               step.z = fabs(step.z - b.min.z);
-            }
-            else
-            {
-               b.min = bmin;
-               b.max = bmax;
-               
-               step = lstep;
-            }
-            
-            float s = float(step.x);
-            
-            if (step.y < s)
-            {
-               s = float(step.y);
-            }
-            if (step.z < s)
-            {
-               s = float(step.z);
-            }
-            
-            autoStep += s;
-            autoStepNormalize += 1.0f;
-            
-            bbox.extendBy(b);
+            continue;
          }
+         
+         Field3D::V3i res = fd.base->dataResolution();
+         
+         Field3D::V3d bmin(0.0, 0.0, 0.0);
+         Field3D::V3d bmax(1.0, 1.0, 1.0);
+         Field3D::V3d lstep(1.0 / double(res.x),
+                            1.0 / double(res.y),
+                            1.0 / double(res.z));
+         Field3D::V3d step;
+         Field3D::Box3d b;
+         
+         if (!mIgnoreTransform)
+         {
+            fd.base->mapping()->localToWorld(bmin, b.min);
+            fd.base->mapping()->localToWorld(bmax, b.max);
+            
+            // Note: b.min is the origin (0, 0, 0) in world space
+            //       localToWorld is transforming its input as a point, not a vector
+            fd.base->mapping()->localToWorld(lstep, step);
+            
+            step.x = fabs(step.x - b.min.x);
+            step.y = fabs(step.y - b.min.y);
+            step.z = fabs(step.z - b.min.z);
+         }
+         else
+         {
+            b.min = bmin;
+            b.max = bmax;
+            
+            step = lstep;
+         }
+         
+         float s = float(step.x);
+         
+         if (step.y < s)
+         {
+            s = float(step.y);
+         }
+         if (step.z < s)
+         {
+            s = float(step.z);
+         }
+         
+         autoStep += s;
+         autoStepNormalize += 1.0f;
+         
+         bbox.extendBy(b);
       }
       
       if (!bbox.isEmpty())
@@ -1489,8 +1360,6 @@ public:
    
    void rayExtents(const AtVolumeIntersectionInfo *info, AtByte tid, float time, const AtPoint *origin, const AtVector *direction, float t0, float t1)
    {
-      AiMsgDebug("[f3d] VolumeData::rayExtents");
-      
       // Note: time is not used...
       
       typedef std::pair<float, float> Extent;
@@ -1512,218 +1381,208 @@ public:
       AiMsgDebug("[f3d]   Direction: (%f, %f, %f)", wray.dir.x, wray.dir.y, wray.dir.z);
       AiMsgDebug("[f3d]   Range: %f -> %f", t0, t1);
       
-      for (PartitionFieldMap::const_iterator pit = mFields.begin(); pit != mFields.end(); ++pit)
+      for (size_t i=0; i<mFields.size(); ++i)
       {
-         for (FieldMap::const_iterator fit = pit->second.begin(); fit != pit->second.end(); ++fit)
+         FieldData &fd = mFields[i];
+         
+         if (!fd.base)
          {
-            if (!fit->second.proxy)
+            continue;
+         }
+         
+         Extent extent;
+         Field3D::Ray3d ray;
+         
+         extent.first = -std::numeric_limits<float>::max();
+         extent.second = std::numeric_limits<float>::max();
+         
+         if (!mIgnoreTransform)
+         {
+            Field3D::V3d tip = wray.pos + wray.dir;
+            
+            fd.base->mapping()->worldToLocal(wray.pos, ray.pos);
+            fd.base->mapping()->worldToLocal(tip, ray.dir);
+            
+            ray.dir -= ray.pos;
+            
+            // normalize ray direction
+            float dlen = ray.dir.length();
+            
+            if (dlen > AI_EPSILON)
             {
-               continue;
-            }
-            
-            AiMsgDebug("[f3d]   Process field %s.%s[%lu]", fit->second.partition.c_str(), fit->second.name.c_str(), fit->second.index);
-            
-            Extent extent;
-            Field3D::Ray3d ray;
-            float escale = 1.0f;
-            
-            extent.first = -std::numeric_limits<float>::max();
-            extent.second = std::numeric_limits<float>::max();
-            
-            if (!mIgnoreTransform)
-            {
-               Field3D::V3d tip = wray.pos + wray.dir;
+               dlen = 1.0f / dlen;
                
-               fit->second.proxy->mapping()->worldToLocal(wray.pos, ray.pos);
-               fit->second.proxy->mapping()->worldToLocal(tip, ray.dir);
-               
-               ray.dir -= ray.pos;
-               
-               escale = ray.dir.length();
-               
-               if (escale < AI_EPSILON)
-               {
-                  continue;
-               }
-               
-               // normalize ray direction
-               
-               escale = 1.0f / escale;
-               
-               ray.dir.x *= escale;
-               ray.dir.y *= escale;
-               ray.dir.z *= escale;
-               
-               AiMsgDebug("[f3d]     Local space origin: (%f, %f, %f)", ray.pos.x, ray.pos.y, ray.pos.z);
-               AiMsgDebug("[f3d]     Local space direction: (%f, %f, %f)", ray.dir.x, ray.dir.y, ray.dir.z);
-               AiMsgDebug("[f3d]     Extents scale: %f", escale);
+               ray.dir.x *= dlen;
+               ray.dir.y *= dlen;
+               ray.dir.z *= dlen;
             }
             else
             {
-               ray.pos = wray.pos;
-               ray.dir = wray.dir;
-            }
-            
-            AiMsgDebug("[f3d]     Bounding box min: (%f, %f, %f)", box.min.x, box.min.y, box.min.z);
-            AiMsgDebug("[f3d]     Bounding box max: (%f, %f, %f)", box.max.x, box.max.y, box.max.z);
-            
-            Field3D::V3d in, out;
-            
-            if (!Imath::findEntryAndExitPoints(ray, box, in, out))
-            {
-               AiMsgDebug("[f3d]     Doesn't intersect");
+               AiMsgWarning("[f3d]     Null direction vector in local space");
                continue;
             }
             
-            extent.first = escale * (in - ray.pos).length();
-            extent.second = escale * (out - ray.pos).length();
+            AiMsgDebug("[f3d]     Local space origin: (%f, %f, %f)", ray.pos.x, ray.pos.y, ray.pos.z);
+            AiMsgDebug("[f3d]     Local space direction: (%f, %f, %f)", ray.dir.x, ray.dir.y, ray.dir.z);
+         }
+         else
+         {
+            ray.pos = wray.pos;
+            ray.dir = wray.dir;
+         }
+         
+         AiMsgDebug("[f3d]     Bounding box min: (%f, %f, %f)", box.min.x, box.min.y, box.min.z);
+         AiMsgDebug("[f3d]     Bounding box max: (%f, %f, %f)", box.max.x, box.max.y, box.max.z);
+         
+         Field3D::V3d in, out;
+         
+         if (!Imath::findEntryAndExitPoints(ray, box, in, out))
+         {
+            continue;
+         }
+         
+         if (!mIgnoreTransform)
+         {
+            // transform back to 'world' space
+            Field3D::V3d _in = in;
+            Field3D::V3d _out = out;
             
-            AiMsgDebug("[f3d]     Extents: %f -> %f", extent.first, extent.second);
-            
-            if (extent.first < extent.second)
+            fd.base->mapping()->localToWorld(_in, in);
+            fd.base->mapping()->localToWorld(_out, out);
+         }
+         
+         extent.first = (in - wray.pos).length();
+         extent.second = (out - wray.pos).length();
+         
+         AiMsgDebug("[f3d]     Extents: %f -> %f", extent.first, extent.second);
+         
+         if (extent.first < extent.second)
+         {
+            extent.first = std::max(extent.first, t0);
+            extent.second = std::min(extent.second, t1);
+         }
+         
+         if (extent.first < extent.second)
+         {
+            if (extents.size() == 0)
             {
-               extent.first = std::max(extent.first, t0);
-               extent.second = std::min(extent.second, t1);
+               extents.push_back(extent);
             }
-            
-            if (extent.first < extent.second)
+            else
             {
-               if (extents.size() == 0)
+               Extents::iterator it = extents.begin();
+               
+               for (; it != extents.end(); ++it)
                {
-                  extents.push_back(extent);
-               }
-               else
-               {
-                  Extents::iterator it = extents.begin();
-                  
-                  for (; it != extents.end(); ++it)
+                  if (extent.second < it->first)
                   {
-                     if (extent.second < it->first)
+                     // new extent before current one
+                     // if we reach here we also know that we don't overlap with the previous interval
+                     extents.insert(it, extent);
+                     
+                     break;
+                  }
+                  else
+                  {
+                     if (extent.first > it->second)
                      {
-                        AiMsgDebug("[f3d]     Before first extent segment");
-                        // new extent before current one
-                        // if we reach here we also know that we don't overlap with the previous interval
-                        extents.insert(it, extent);
-                        
-                        break;
+                        // new extent after current one
+                        continue;
                      }
                      else
                      {
-                        if (extent.first > it->second)
+                        // Do I really need to check for extent.first < it->first
+                        // It should only happend for first extent so the merging logic
+                        //   is un-necessary (though it doesn't hurt)
+                        
+                        if (extent.first < it->first)
                         {
-                           // new extent after current one
-                           continue;
+                           it->first = extent.first;
+                           
+                           Extents::iterator pit = it;
+                           
+                           while (pit != extents.begin())
+                           {
+                              --pit;
+                              
+                              if (pit->second > it->first)
+                              {
+                                 // merge with previous extent
+                                 it->first = pit->first;
+                                 it->second = std::max(pit->second, it->second);
+                                 
+                                 it = extents.erase(pit);
+                                 
+                                 pit = it;
+                              }
+                              else
+                              {
+                                 pit = extents.begin();
+                              }
+                           }
+                        }
+                        
+                        if (extent.second > it->second)
+                        {
+                           it->second = extent.second;
+                           
+                           Extents::iterator nit = it;
+                           ++nit;
+                           
+                           while (nit != extents.end())
+                           {
+                              if (nit->first < it->second)
+                              {
+                                 // merge with next extent
+                                 nit->first = it->first;
+                                 nit->second = std::max(it->second, nit->second);
+                                 
+                                 it = extents.erase(it);
+                                 
+                                 nit = it;
+                                 ++nit;
+                              }
+                              else
+                              {
+                                 nit = extents.end();
+                              }
+                           }
                         }
                         else
                         {
-                           // Do I really need to check for extent.first < it->first
-                           // It should only happend for first extent so the merging logic
-                           //   is un-necessary (though it doesn't hurt)
-                           
-                           if (extent.first < it->first)
-                           {
-                              AiMsgDebug("[f3d]     Update current extent start");
-                              
-                              it->first = extent.first;
-                              
-                              Extents::iterator pit = it;
-                              
-                              while (pit != extents.begin())
-                              {
-                                 --pit;
-                                 
-                                 if (pit->second > it->first)
-                                 {
-                                    AiMsgDebug("[f3d]     Merge with previous extent segment");
-                                    
-                                    // merge with previous extent
-                                    it->first = pit->first;
-                                    it->second = std::max(pit->second, it->second);
-                                    
-                                    it = extents.erase(pit);
-                                    
-                                    pit = it;
-                                 }
-                                 else
-                                 {
-                                    pit = extents.begin();
-                                 }
-                              }
-                           }
-                           
-                           if (extent.second > it->second)
-                           {
-                              AiMsgDebug("[f3d]     Update current extent end");
-                              
-                              it->second = extent.second;
-                              
-                              Extents::iterator nit = it;
-                              ++nit;
-                              
-                              while (nit != extents.end())
-                              {
-                                 if (nit->first < it->second)
-                                 {
-                                    AiMsgDebug("[f3d]     Merge with next extent segment");
-                                    
-                                    // merge with next extent
-                                    nit->first = it->first;
-                                    nit->second = std::max(it->second, nit->second);
-                                    
-                                    it = extents.erase(it);
-                                    
-                                    nit = it;
-                                    ++nit;
-                                 }
-                                 else
-                                 {
-                                    nit = extents.end();
-                                 }
-                              }
-                           }
-                           else
-                           {
-                              // new extent completely inside existing one
-                              AiMsgDebug("[f3d]     Contained in existing extent segment");
-                           }
-                           
-                           break;
+                           // new extent completely inside existing one
                         }
+                        
+                        break;
                      }
                   }
-                  
-                  if (it == extents.end())
-                  {
-                     AiMsgDebug("[f3d]     After last extent segment");
-                     
-                     extents.push_back(extent);
-                  }
+               }
+               
+               if (it == extents.end())
+               {
+                  extents.push_back(extent);
                }
             }
-            else
-            {
-               AiMsgDebug("[f3d]     Doesn't intersect");
-            }
+         }
+         else
+         {
+            // doesn't intersect
          }
       }
       
+      if (!info)
+      {
+         return;
+      }
       
-      AiMsgDebug("[f3d]   Extents in [%f, %f]", t0, t1);
       for (size_t i=0; i<extents.size(); ++i)
       {
-         AiMsgDebug("[f3d]     [%lu]: %f -> %f", i, extents[i].first, extents[i].second);
-         
-         if (info)
-         {
-            AiVolumeAddIntersection(info, extents[i].first, extents[i].second);
-         }
+         AiVolumeAddIntersection(info, extents[i].first, extents[i].second);
       }
    }
    
    bool sample(const char *channel, const AtShaderGlobals *sg, int interp, AtParamValue *value, AtByte *type)
    {
-      AiMsgDebug("[f3d] VolumeData::sample");
-      
       if (!sg || !value || !type)
       {
          return false;
@@ -1736,7 +1595,6 @@ public:
       unitCube.min = Field3D::V3d(0.0, 0.0, 0.0);
       unitCube.max = Field3D::V3d(1.0, 1.0, 1.0);
       
-      int totalCount = 0;
       int hitCount = 0;
       
       std::map<std::string, SampleMergeType>::const_iterator mtit = mChannelsMergeType.find(channel);
@@ -1744,16 +1602,18 @@ public:
       
       *type = AI_TYPE_UNDEFINED;
       
-      for (PartitionFieldMap::iterator pit = mFields.begin(); pit != mFields.end(); ++pit)
+      FieldIndices::iterator it = mFieldIndices.find(channel);
+      
+      if (it != mFieldIndices.end())
       {
-         for (FieldMap::iterator fit = pit->second.begin(); fit != pit->second.end(); ++fit)
+         std::vector<size_t> &indices = it->second;
+         
+         for (size_t i=0; i<indices.size(); ++i)
          {
-            if (!strncmp(channel, fit->first.c_str(), cmplen))
+            FieldData &fd = mFields[indices[i]];
+            
+            if (fd.base)
             {
-               AiMsgDebug("[f3d]   Process field %s.%s[%lu]", fit->second.partition.c_str(), fit->second.name.c_str(), fit->second.index);
-               
-               ++totalCount;
-               
                // check if inside nox
                Field3D::V3d Pw(sg->Po.x, sg->Po.y, sg->Po.z);
                Field3D::V3d Pl;
@@ -1762,28 +1622,21 @@ public:
                if (mIgnoreTransform)
                {
                   Pl = Pw;
-                  fit->second.proxy->mapping()->localToVoxel(Pw, Pv);
+                  fd.base->mapping()->localToVoxel(Pw, Pv);
                }
                else
                {
-                  fit->second.proxy->mapping()->worldToLocal(Pw, Pl);
-                  fit->second.proxy->mapping()->worldToVoxel(Pw, Pv);
+                  fd.base->mapping()->worldToLocal(Pw, Pl);
+                  fd.base->mapping()->worldToVoxel(Pw, Pv);
                }
                
                if (!unitCube.intersects(Pl))
                {
-                  AiMsgDebug("[f3d]     Not in volume");
-                  // what value to set?
+                  // Not inside volume. Default value?
                }
                else
                {
-                  if (!fit->second.base && !fit->second.setup(mF3DFile))
-                  {
-                     AiMsgWarning("[f3d]     Could not setup field");
-                     continue;
-                  }
-                  
-                  if (fit->second.sample(Pv, interp, mergeType, value, type))
+                  if (fd.sample(Pv, interp, mergeType, value, type))
                   {
                      ++hitCount;
                   }
@@ -1791,11 +1644,14 @@ public:
             }
          }
       }
+      else
+      {
+         AiMsgWarning("[f3d] No channel \"%s\" in file \"%s\"", channel, mPath.c_str());
+      }
       
       if (hitCount > 1 && mergeType == SMT_avg)
       {
-         AiMsgDebug("[f3d]   Averaging result");
-         
+         // averaging results
          float scl = 1.0f / float(hitCount);
          
          if (*type == AI_TYPE_FLOAT)
@@ -1815,23 +1671,21 @@ public:
 
 private:
    
-   typedef std::map<std::string, FieldData> FieldMap;
-   typedef std::map<std::string, FieldMap> PartitionFieldMap;
+   typedef std::map<std::string, std::vector<size_t> > FieldIndices;
+   typedef std::deque<FieldData> Fields;
    
    // fill in with whatever necessary
    const AtNode *mNode;
    Field3D::Field3DInputFile *mF3DFile;
    
-   // from parameter string or user attributes
    std::string mPath;
    std::string mPartition;
    bool mIgnoreTransform;
    bool mVerbose;
-   
    std::map<std::string, SampleMergeType> mChannelsMergeType;
    
-   // field contents
-   PartitionFieldMap mFields;
+   FieldIndices mFieldIndices;
+   Fields mFields;
 };
 
 // ---
@@ -1903,7 +1757,6 @@ bool F3D_UpdateVolume(void *user_ptr, const char *user_string, const AtNode *nod
    }
    else
    {
-      AiMsgDebug("[f3d] F3D_UpdateVolume: private_info is not set");
       data->bbox.min = AI_P3_ZERO;
       data->bbox.max = AI_P3_ZERO;
       data->auto_step_size = std::numeric_limits<float>::max();
