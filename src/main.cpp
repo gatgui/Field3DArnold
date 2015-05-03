@@ -40,8 +40,50 @@ enum SampleMergeType
    SMT_add = 0,
    SMT_max,
    SMT_min,
-   SMT_avg
+   SMT_avg,
+   SMT_unknown
 };
+
+static SampleMergeType MergeTypeFromString(const std::string &s)
+{
+   if (s == "avg")
+   {
+      return SMT_avg;
+   }
+   else if (s == "add")
+   {
+      return SMT_add;
+   }
+   else if (s == "max")
+   {
+      return SMT_max;
+   }
+   else if (s == "min")
+   {
+      return SMT_min;
+   }
+   else
+   {
+      return SMT_unknown;
+   }
+}
+
+static const char* MergeTypeToString(SampleMergeType t)
+{
+   switch (t)
+   {
+   case SMT_avg:
+      return "avg";
+   case SMT_min:
+      return "min";
+   case SMT_max:
+      return "max";
+   case SMT_add:
+      return "add";
+   default:
+      return "";
+   }
+}
 
 template <typename ValueType> struct ArnoldType { enum { Value = AI_TYPE_UNDEFINED }; };
 template <> struct ArnoldType<Field3D::half> { enum { Value = AI_TYPE_FLOAT }; };
@@ -597,333 +639,170 @@ public:
       reset();
       
       float frame = 1.0f;
+      std::vector<std::string> mergeTypes;
       
       // Figure out frame default value from options node
       AtNode *opts = AiUniverseGetOptions();
-      const AtUserParamEntry *param = AiNodeLookUpUserParameter(opts, "frame");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
+      
+      if (readFloatUserAttr(opts, "frame", frame))
       {
-         int ptype = AiUserParamGetType(param);
-         switch (ptype)
-         {
-         case AI_TYPE_BYTE:
-            frame = float(AiNodeGetByte(opts, "frame"));
-            break;
-         case AI_TYPE_INT:
-            frame = float(AiNodeGetInt(opts, "frame"));
-            break;
-         case AI_TYPE_UINT:
-            frame = float(AiNodeGetUInt(opts, "frame"));
-            break;
-         case AI_TYPE_FLOAT:
-            frame = AiNodeGetFlt(opts, "frame");
-            break;
-         default:
-            break;
-         }
+         AiMsgDebug("[volume_field3d] 'frame' read from options node");
       }
       
       // Read params from string data
-      size_t p0;
-      size_t p1;
-      size_t p2;
-      size_t p3;
-      size_t p4;
-      
+      std::vector<std::string> args;
       std::string paramString = (user_string ? user_string : "");
       
-      p0 = 0;
-      p1 = paramString.find('-', p0);
+      splitParamString(user_string, args);
       
-      while (p1 != std::string::npos)
+      for (size_t i=0; i<args.size(); ++i)
       {
-         p2 = paramString.find_first_of(" \t\n", p1);
+         std::string &arg = args[i];
          
-         if (p2 != std::string::npos)
+         if (arg.length() == 0)
          {
-            std::string flag = paramString.substr(p1, p2 - p1);
-            std::string arg;
-            
-            if (flag != "-ignoreXform" && flag != "-verbose")
+            continue;
+         }
+         
+         if (arg[0] != '-')
+         {
+            AiMsgWarning("[volume_field3d] Expected flag, ignoring '%s'", arg.c_str());
+            continue;
+         }
+         
+         if (arg == "-file")
+         {
+            if (++i >= args.size())
             {
-               p3 = paramString.find_first_not_of(" \t\n", p2);
-                  
-               if (p3 == std::string::npos)
-               {
-                  AiMsgError("[volume_field3d] Missing value for %s flag", flag.c_str());
-                  reset();
-                  return false;
-               }
+               AiMsgWarning("[volume_field3d] -file flag expects an argument");
             }
             else
             {
-               p3 = p2;
+               mPath = args[i];
             }
-            
-            if (flag == "-file" ||
-                flag == "-partition" ||
-                flag == "-merge")
+         }
+         else if (arg == "-partition")
+         {
+            if (++i >= args.size())
             {
-               bool inQuotes = false;
-               
-               if (paramString[p3] == '"')
-               {
-                  inQuotes = true;
-                  p4 = paramString.find('"', p3 + 1);
-               }
-               else if (paramString[p3] == '\'')
-               {
-                  inQuotes = true;
-                  p4 = paramString.find('\'', p3 + 1);
-               }
-               else
-               {
-                  p4 = paramString.find_first_of(" \t\n", p3 + 1);
-               }
-               
-               if (p4 == std::string::npos)
-               {
-                  if (inQuotes)
-                  {
-                     AiMsgError("[volume_field3d] Missing value for %s flag", flag.c_str());
-                     reset();
-                     return false;
-                  }
-                  else
-                  {
-                     arg = paramString.substr(p3);
-                  }
-               }
-               else
-               {
-                  int off = (inQuotes ? 1 : 0);
-                  
-                  arg = paramString.substr(p3 + off, p4 - p3 - off);
-               }
-               
-               if (flag == "-file")
-               {
-                  mPath = arg;
-               }
-               else if (flag == "-partition")
-               {
-                  mPartition = arg;
-               }
-               else if (flag == "-merge")
-               {
-                  size_t m0 = 0;
-                  size_t m1 = arg.find(',', m0);
-                  
-                  while (m0 != std::string::npos)
-                  {
-                     std::string md = arg.substr(m0, (m1 == std::string::npos ? m1 : m1 - m0));
-                     
-                     size_t m2 = md.find('=');
-                     
-                     if (m2 != std::string::npos)
-                     {
-                        std::string channel = md.substr(0, m2);
-                        std::string mtype = md.substr(m2 + 1);
-                        
-                        if (mtype == "avg")
-                        {
-                           mChannelsMergeType[channel] = SMT_avg;
-                           AiMsgDebug("[volume_field3d] Using AVG merge for channel \"%s\"", channel.c_str());
-                        }
-                        else if (mtype == "add")
-                        {
-                           mChannelsMergeType[channel] = SMT_add;
-                           AiMsgDebug("[volume_field3d] Using ADD merge for channel \"%s\"", channel.c_str());
-                        }
-                        else if (mtype == "max")
-                        {
-                           mChannelsMergeType[channel] = SMT_max;
-                           AiMsgDebug("[volume_field3d] Using MAX merge for channel \"%s\"", channel.c_str());
-                        }
-                        else if (mtype == "min")
-                        {
-                           mChannelsMergeType[channel] = SMT_min;
-                           AiMsgDebug("[volume_field3d] Using MIN merge for channel \"%s\"", channel.c_str());
-                        }
-                     }
-                     
-                     m0 = (m1 == std::string::npos ? m1 : m1 + 1);
-                     m1 = arg.find(',', m0);
-                  }
-               }
-               
-               p0 = (p4 != std::string::npos ? p4 + 1 : p4);
+               AiMsgWarning("[volume_field3d] -partition flag expects an argument");
             }
-            else if (flag == "-frame")
+            else
+            {
+               mPartition = args[i];
+            }
+         }
+         else if (arg == "-frame")
+         {
+            if (++i >= args.size())
+            {
+               AiMsgWarning("[volume_field3d] -frame flag expects an argument");
+            }
+            else
             {
                float farg = 0.0f;
                
-               p4 = paramString.find_first_of(" \t\n", p3 + 1);
-               
-               arg = paramString.substr(p3, (p4 != std::string::npos ? p4 - p3 : std::string::npos));
-               
-               if (sscanf(arg.c_str(), "%f", &farg) == 1)
+               if (sscanf(args[i].c_str(), "%f", &farg) == 1)
                {
                   frame = farg;
                }
                else
                {
-                  AiMsgError("[volume_field3d] Invalid value for -frame: %s", arg.c_str());
+                  AiMsgWarning("[volume_field3d] -frame flag expects a float argument");
                }
-               
-               p0 = (p4 != std::string::npos ? p4 + 1 : p4);
             }
-            else if (flag == "-ignoreXform")
+         }
+         else if (arg == "-merge")
+         {
+            if (++i >= args.size())
             {
-               mIgnoreTransform = true;
-               
-               p0 = p2 + 1;
-            }
-            else if (flag == "-verbose")
-            {
-               mVerbose = true;
-               
-               p0 = p2 + 1;
+               AiMsgWarning("[volume_field] -merge flag expects at least 2 arguments");
             }
             else
             {
-               AiMsgError("[volume_field3d] Invalid flag \"%s\"", flag.c_str());
-               reset();
-               return false;
+               splitString(args[i], ';', true, mergeTypes);
             }
-            
-            p1 = paramString.find('-', p0);
+         }
+         else if (arg == "-verbose")
+         {
+            mVerbose = true;
+         }
+         else if (arg == "-ignoreXform")
+         {
+            mIgnoreTransform = true;
          }
          else
          {
-            std::string flag = paramString.substr(p1);
-            
-            if (flag == "-ignoreXform")
-            {
-               mIgnoreTransform = true;
-            }
-            else if (flag == "-verbose")
-            {
-               mVerbose = true;
-            }
-            else
-            {
-               AiMsgError("[volume_field3d] Unknown flag \"%s\"", flag.c_str());
-               reset();
-               return false;
-            }
-            
-            p0 = std::string::npos;
-            p1 = p0;
-         }
-      }
-      
-      if (p0 != std::string::npos)
-      {
-         std::string remain = paramString.substr(p0);
-         
-         if (remain.find_first_not_of(" \t\n") != std::string::npos)
-         {
-            // No more flag left in string
-            AiMsgError("[volume_field3d] Invalid parameter string (cannot parse \"%s\")", remain.c_str());
-            reset();
-            return false;
+            AiMsgWarning("[volume_field3d] Invalid flag '%s'", arg.c_str());
          }
       }
       
       // Read params from user attributes
-      param = AiNodeLookUpUserParameter(node, "file");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_STRING)
+      if (readStringUserAttr(node, "file", mPath))
       {
-         mPath = AiNodeGetStr(node, "file");
+         AiMsgDebug("[volume_field3d] User attribute 'file' found. '-file' flag overridden");
+      }
+      if (readStringUserAttr(node, "partition", mPartition))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'partition' found. '-partition' flag overridden");
+      }
+      if (readStringArrayUserAttr(node, "merge", ';', true, mergeTypes))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'merge' found. '-merge' flag overridden");
+      }
+      if (readFloatUserAttr(node, "frame", frame))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'frame' found. '-frame' flag overridden");
+      }
+      if (readBoolUserAttr(node, "ignoreXform", mIgnoreTransform))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'ignoreXform' found. '-ignoreXform' flag overridden");
+      }
+      if (readBoolUserAttr(node, "verbose", mVerbose))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'verbose' found. '-verbose' flag overridden");
       }
       
-      param = AiNodeLookUpUserParameter(node, "partition");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_STRING)
+      // fill mChannelsMergeType dictionnary
+      for (size_t i=0; i<mergeTypes.size(); ++i)
       {
-         mPartition = AiNodeGetStr(node, "partition");
-      }
-      
-      param = AiNodeLookUpUserParameter(node, "merge");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_ARRAY && AiUserParamGetArrayType(param) == AI_TYPE_STRING)
-      {
-         AtArray *ary = AiNodeGetArray(node, "merge");
+         std::string &md = mergeTypes[i];
          
-         for (unsigned int i=0; i<ary->nelements; ++i)
+         size_t p = md.find('=');
+         
+         if (p != std::string::npos)
          {
-            std::string md = AiArrayGetStr(ary, i);
+            std::string channel = md.substr(0, p);
+            SampleMergeType mtype = MergeTypeFromString(md.substr(p + 1));
             
-            size_t p0 = md.find('=');
-            
-            if (p0 != std::string::npos)
+            if (channel.length() > 0 && mtype != SMT_unknown)
             {
-               std::string channel = md.substr(0, p0);
-               std::string mtype = md.substr(p0 + 1);
-               
-               if (mtype == "avg")
-               {
-                  mChannelsMergeType[channel] = SMT_avg;
-                  AiMsgDebug("[volume_field3d] Using AVG merge for channel \"%s\"", channel.c_str());
-               }
-               else if (mtype == "add")
-               {
-                  mChannelsMergeType[channel] = SMT_add;
-                  AiMsgDebug("[volume_field3d] Using ADD merge for channel \"%s\"", channel.c_str());
-               }
-               else if (mtype == "max")
-               {
-                  mChannelsMergeType[channel] = SMT_max;
-                  AiMsgDebug("[volume_field3d] Using MAX merge for channel \"%s\"", channel.c_str());
-               }
-               else if (mtype == "min")
-               {
-                  mChannelsMergeType[channel] = SMT_min;
-                  AiMsgDebug("[volume_field3d] Using MIN merge for channel \"%s\"", channel.c_str());
-               }
+               mChannelsMergeType[channel] = mtype;
+               AiMsgDebug("[volume_field3d] Using %s merge for channel \"%s\"", MergeTypeToString(mtype), channel.c_str());
             }
          }
       }
       
-      param = AiNodeLookUpUserParameter(node, "frame");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
+      #ifdef _DEBUG
+      AiMsgDebug("[volume_field3d] Parameters:")
+      AiMsgDebug("[volume_field3d]   path = '%s'", mPath.c_str());
+      AiMsgDebug("[volume_field3d]   partition = '%s'", mPartition.c_str());
+      AiMsgDebug("[volume_field3d]   frame = %f", frame);
+      AiMsgDebug("[volume_field3d]   ignore transform = %s", mIgnoreTransform ? "true" : "false");
+      AiMsgDebug("[volume_field3d]   verbose = %s", mVerbose ? "true" : "false");
+      for (std::map<std::string, SampleMergeType>::iterator mtit=mChannelsMergeType.begin(); mtit!=mChannelsMergeType.end(); ++mtit)
       {
-         int ptype = AiUserParamGetType(param);
-         switch (ptype)
-         {
-         case AI_TYPE_BYTE:
-            frame = float(AiNodeGetByte(node, "frame"));
-            break;
-         case AI_TYPE_INT:
-            frame = float(AiNodeGetInt(node, "frame"));
-            break;
-         case AI_TYPE_UINT:
-            frame = float(AiNodeGetUInt(node, "frame"));
-            break;
-         case AI_TYPE_FLOAT:
-            frame = AiNodeGetFlt(node, "frame");
-            break;
-         default:
-            break;
-         }
+         AiMsgDebug("[volume_field3d]   '%s' channel merge = %s", mtit->first.c_str(), MergeTypeToString(mtit->second));
       }
-      
-      param = AiNodeLookUpUserParameter(node, "ignoreXform");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
-      {
-         mIgnoreTransform = AiNodeGetBool(node, "ignoreXform");
-      }
-      
-      param = AiNodeLookUpUserParameter(node, "verbose");
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
-      {
-         mVerbose = AiNodeGetBool(node, "verbose");
-      }
+      #endif
       
       // Replace frame in path (if necessary)
       // allow ###, %03d, or yet <frame> and <frame:pad> tokens in file path
       int iframe = int(floorf(frame));
       
-      p0 = mPath.find_last_of("\\/");
+      size_t p0 = mPath.find_last_of("\\/");
+      size_t p1;
+      size_t p2;
       
       std::string dirname = (p0 != std::string::npos ? mPath.substr(0, p0) : "");
       std::string basename = (p0 != std::string::npos ? mPath.substr(p0 + 1) : mPath);
@@ -1041,67 +920,6 @@ public:
       {
          return true;
       }
-   }
-   
-   //addFields(partition, layer, FDT_half, false, hfields, pfcit->second, gfcit->second);
-   template <typename DataType>
-   void addFields(const std::string &partition, const std::string &layer,
-                  FieldDataType dataType, bool isVector,
-                  typename Field3D::Field<DataType>::Vec &fields, 
-                  size_t &partitionFieldCount, size_t &globalFieldCount)
-   {
-      size_t maxlen = partition.length() + layer.length() + 32;
-      char *tmp = (char*) AiMalloc(maxlen * sizeof(char));
-      
-      for (size_t i=0; i<fields.size(); ++i)
-      {
-         FieldData fd;
-         
-         fd.partition = partition;
-         fd.name = layer;
-         
-         if (!fd.setup(fields[i], dataType, isVector))
-         {
-            continue;
-         }
-         
-         fd.partitionIndex = partitionFieldCount++;
-         fd.globalIndex = globalFieldCount++;
-         
-         if (mVerbose)
-         {
-            AiMsgInfo("[volume_field3d] Add %s channel '%s.%s[%lu]'", isVector ? "vector" : "scalar", partition.c_str(), layer.c_str(), fd.partitionIndex);
-            AiMsgInfo("[volume_field3d]   also accessible as: '%s.%s', '%s[%lu]' and '%s'", partition.c_str(), layer.c_str(), layer.c_str(), fd.globalIndex, layer.c_str());
-         }
-         
-         { // partition.field[index]
-            sprintf(tmp, "%s.%s[%lu]", partition.c_str(), layer.c_str(), fd.partitionIndex);
-            std::vector<size_t> &indices = mFieldIndices[tmp];
-            indices.push_back(mFields.size());
-         }
-         
-         { // partition.field
-            sprintf(tmp, "%s.%s", partition.c_str(), layer.c_str());
-            std::vector<size_t> &indices = mFieldIndices[tmp];
-            indices.push_back(mFields.size());
-         }
-         
-         { // field[index]
-            sprintf(tmp, "%s[%lu]", layer.c_str(), fd.globalIndex);
-            std::vector<size_t> &indices = mFieldIndices[tmp];
-            indices.push_back(mFields.size());
-         }
-         
-         { // field
-            sprintf(tmp, "%s", layer.c_str());
-            std::vector<size_t> &indices = mFieldIndices[tmp];
-            indices.push_back(mFields.size());
-         }
-         
-         mFields.push_back(fd);
-      }
-      
-      AiFree(tmp);
    }
    
    bool setup()
@@ -1602,7 +1420,7 @@ public:
    bool sample(const char *channel, const AtShaderGlobals *sg, int interp, AtParamValue *value, AtByte *type)
    {
       #ifdef _DEBUG
-      AiMsgDebug("[volume_field3d] Sample channel \"%s\"", channel);
+      AiMsgDebug("[volume_field3d] Sample channel \"%s\" (t=%f)", channel, sg->time);
       #endif
       
       if (!sg || !value || !type)
@@ -1611,17 +1429,14 @@ public:
          return false;
       }
       
-      size_t cmplen = strlen(channel);
-      
+      std::map<std::string, SampleMergeType>::const_iterator mtit;
+      SampleMergeType mergeType;
       Field3D::Box3d unitCube;
       
       unitCube.min = Field3D::V3d(0.0, 0.0, 0.0);
       unitCube.max = Field3D::V3d(1.0, 1.0, 1.0);
       
       int hitCount = 0;
-      
-      std::map<std::string, SampleMergeType>::const_iterator mtit = mChannelsMergeType.find(channel);
-      SampleMergeType mergeType = (mtit != mChannelsMergeType.end() ? mtit->second : SMT_add);
       
       *type = AI_TYPE_UNDEFINED;
       
@@ -1664,6 +1479,9 @@ public:
                
                if (unitCube.intersects(Pl))
                {
+                  mtit = mChannelsMergeType.find(fd.name);
+                  mergeType = (mtit != mChannelsMergeType.end() ? mtit->second : SMT_add);
+                  
                   if (fd.sample(Pv, interp, mergeType, value, type))
                   {
                      ++hitCount;
@@ -1705,6 +1523,322 @@ public:
       return (hitCount > 0);
    }
 
+private:
+   
+   template <typename DataType>
+   void addFields(const std::string &partition, const std::string &layer,
+                  FieldDataType dataType, bool isVector,
+                  typename Field3D::Field<DataType>::Vec &fields, 
+                  size_t &partitionFieldCount, size_t &globalFieldCount)
+   {
+      size_t maxlen = partition.length() + layer.length() + 32;
+      char *tmp = (char*) AiMalloc(maxlen * sizeof(char));
+      
+      for (size_t i=0; i<fields.size(); ++i)
+      {
+         FieldData fd;
+         
+         fd.partition = partition;
+         fd.name = layer;
+         
+         if (!fd.setup(fields[i], dataType, isVector))
+         {
+            continue;
+         }
+         
+         fd.partitionIndex = partitionFieldCount++;
+         fd.globalIndex = globalFieldCount++;
+         
+         if (mVerbose)
+         {
+            AiMsgInfo("[volume_field3d] Add %s channel '%s.%s[%lu]'", isVector ? "vector" : "scalar", partition.c_str(), layer.c_str(), fd.partitionIndex);
+            AiMsgInfo("[volume_field3d]   also accessible as: '%s.%s', '%s[%lu]' and '%s'", partition.c_str(), layer.c_str(), layer.c_str(), fd.globalIndex, layer.c_str());
+         }
+         
+         { // partition.field[index]
+            sprintf(tmp, "%s.%s[%lu]", partition.c_str(), layer.c_str(), fd.partitionIndex);
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // partition.field
+            sprintf(tmp, "%s.%s", partition.c_str(), layer.c_str());
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // field[index]
+            sprintf(tmp, "%s[%lu]", layer.c_str(), fd.globalIndex);
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         { // field
+            sprintf(tmp, "%s", layer.c_str());
+            std::vector<size_t> &indices = mFieldIndices[tmp];
+            indices.push_back(mFields.size());
+         }
+         
+         mFields.push_back(fd);
+      }
+      
+      AiFree(tmp);
+   }
+   
+   void stripString(std::string &s)
+   {
+      size_t p = s.find_first_not_of(" \t\n");
+      
+      if (p == std::string::npos)
+      {
+         s = "";
+         return;
+      }
+      
+      s = s.substr(p);
+      
+      p = s.find_last_not_of(" \t\n");
+      
+      if (p != std::string::npos)
+      {
+         s = s.substr(0, p+1);
+      }
+   }
+   
+   size_t splitString(const std::string &in, char sep, bool strip, std::vector<std::string> &out)
+   {
+      out.clear();
+      
+      std::string tmp;
+      size_t p0 = 0;
+      size_t p1 = in.find(sep, p0);
+      
+      while (p1 != std::string::npos)
+      {
+         tmp = in.substr(p0, p1 - p0);
+         
+         if (strip)
+         {
+            stripString(tmp);
+         }
+         
+         if (tmp.length() > 0)
+         {
+            out.push_back(tmp);
+         }
+         
+         p0 = p1 + 1;
+         p1 = in.find(sep, p0);
+      }
+      
+      tmp = in.substr(p0);
+      
+      if (strip)
+      {
+         stripString(tmp);
+      }
+      
+      if (tmp.length() > 0)
+      {
+         out.push_back(tmp);
+      }
+      
+      return out.size();
+   }
+   
+   size_t splitParamString(const std::string &in, std::vector<std::string> &out)
+   {
+      static const char *sSplitChars = " \t\n";
+      
+      out.clear();
+      
+      std::string tmp;
+      std::string part;
+      bool inquotes = false;
+      size_t p0 = in.find_first_not_of(sSplitChars);
+      size_t p1 = in.find_first_of(sSplitChars, p0);
+      size_t p2;
+      
+      while (p1 != std::string::npos)
+      {
+         tmp = in.substr(p0, p1 - p0);
+         
+         if (tmp.length() > 0)
+         {
+            if (inquotes)
+            {
+               if (tmp[tmp.length()-1] != '"')
+               {
+                  part = part + " " + tmp;
+               }
+               else
+               {
+                  out.push_back(part + tmp.substr(0, tmp.length() - 1));
+                  inquotes = false;
+               }
+            }
+            else
+            {
+               if (tmp[0] == '"' && tmp[tmp.length()-1] != '"')
+               {
+                  part = tmp;
+                  inquotes = true;
+               }
+               else
+               {
+                  out.push_back(tmp);
+               }
+            }
+         }
+         
+         p2 = in.find_first_not_of(sSplitChars, p1);
+         
+         // also keep white spaces if we're inside a quoted string
+         if (inquotes && p2 != std::string::npos)
+         {
+            part += in.substr(p1, p2 - p1);
+         }
+         
+         p0 = p2;
+         p1 = in.find_first_of(sSplitChars, p0);
+      }
+      
+      tmp = in.substr(p0);
+      
+      if (tmp.length() > 0)
+      {
+         if (inquotes)
+         {
+            if (tmp[tmp.length()-1] != '"')
+            {
+               AiMsgWarning("[volume_field3d] Unterminated string argument");
+               out.push_back(part + tmp);
+            }
+            else
+            {
+               out.push_back(part + tmp.substr(0, tmp.length() - 1));
+            }
+         }
+         else
+         {
+            out.push_back(tmp);
+         }
+      }
+      
+      return out.size();
+   }
+   
+   bool readBoolUserAttr(const AtNode *node, const char *paramName, bool &out)
+   {
+      const AtUserParamEntry *param = AiNodeLookUpUserParameter(node, paramName);
+      
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
+      {
+         out = AiNodeGetBool(node, paramName);
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+   
+   bool readFloatUserAttr(const AtNode *node, const char *paramName, float &out)
+   {
+      const AtUserParamEntry *param = AiNodeLookUpUserParameter(node, paramName);
+      
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
+      {
+         int ptype = AiUserParamGetType(param);
+         
+         switch (ptype)
+         {
+         case AI_TYPE_BYTE:
+            out = float(AiNodeGetByte(node, paramName));
+            break;
+         case AI_TYPE_INT:
+            out = float(AiNodeGetInt(node, paramName));
+            break;
+         case AI_TYPE_UINT:
+            out = float(AiNodeGetUInt(node, paramName));
+            break;
+         case AI_TYPE_FLOAT:
+            out = AiNodeGetFlt(node, paramName);
+            break;
+         default:
+            return false;
+         }
+         
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+   
+   bool readStringUserAttr(const AtNode *node, const char *paramName, std::string &out)
+   {
+      const AtUserParamEntry *param = AiNodeLookUpUserParameter(node, paramName);
+      
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_STRING)
+      {
+         out = AiNodeGetStr(node, paramName);
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+   
+   bool readStringArrayUserAttr(const AtNode *node, const char *paramName, char sep, bool strip, std::vector<std::string> &out)
+   {
+      const AtUserParamEntry *param = AiNodeLookUpUserParameter(node, paramName);
+      
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
+      {
+         std::string tmp;
+         
+         if (AiUserParamGetType(param) == AI_TYPE_ARRAY && AiUserParamGetArrayType(param) == AI_TYPE_STRING)
+         {
+            out.clear();
+            
+            AtArray *ary = AiNodeGetArray(node, paramName);
+            
+            for (unsigned int i=0; i<ary->nelements; ++i)
+            {
+               tmp = AiArrayGetStr(ary, i);
+               
+               if (strip)
+               {
+                  stripString(tmp);
+               }
+               
+               out.push_back(tmp);
+            }
+            
+            return true;
+         }
+         else if (AiUserParamGetType(param) == AI_TYPE_STRING)
+         {
+            tmp = AiNodeGetStr(node, paramName);
+            
+            splitString(tmp, sep, strip, out);
+            
+            return true;
+         }
+         else
+         {
+            return false;
+         }
+      }
+      else
+      {
+         return false;
+      }
+   }
+   
 private:
    
    typedef std::map<std::string, std::vector<size_t> > FieldIndices;
