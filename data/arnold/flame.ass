@@ -1,0 +1,379 @@
+### exported: Sun May  3 17:31:18 2015
+### from:     Arnold 4.2.6.2 darwin clang-3.6.0 oiio-1.5.13 rlm-11.2.2 2015/04/30 15:38:38
+### host app: MtoA 1.2.2.0 b31c3a13a3b4 (Master) MtoA-1.2.2.0 Maya 2013 x64
+
+
+
+options
+{
+ AA_seed 32
+ outputs "RGBA RGBA defaultArnoldFilter@gaussian_filter defaultArnoldDriver@driver_exr.RGBA.RGBA"
+ xres 640
+ yres 480
+ aspect_ratio 1.00000012
+ texture_per_file_stats on
+ texture_searchpath "/Users/gatgui/Documents/maya/projects/default/sourceimages"
+ texture_glossy_blur 0
+ camera "perspShape"
+ procedural_searchpath "/Users/gatgui/Documents/maya/projects/default/"
+ preserve_scene_data on
+ texture_gamma 2.20000005
+ light_gamma 2.20000005
+ shader_gamma 2.20000005
+ GI_diffuse_depth 1
+ GI_glossy_depth 1
+ GI_diffuse_samples 0
+ GI_glossy_samples 0
+ GI_refraction_samples 0
+ declare frame constant FLOAT
+ frame 32
+ declare render_layer constant STRING
+ render_layer "defaultRenderLayer"
+ declare fps constant FLOAT
+ fps 24
+}
+
+persp_camera
+{
+ name perspShape
+ fov 54.4322243
+ focus_distance 1
+ aperture_size 0
+ aperture_blades 0
+ aperture_rotation 0
+ aperture_blade_curvature 0
+ aperture_aspect_ratio 1
+ uv_remap 0 0 0 0
+ matrix
+ 0.906307817 0 -0.42261827 0
+ -0.103230499 0.969708741 -0.22137852 0
+ 0.409816623 0.244264171 0.878854573 0
+ 6.13349009 2.33560181 13.1533127 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 1
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ screen_window_min -1 -1
+ screen_window_max 1 1
+ exposure 0
+}
+
+ortho_camera
+{
+ name topShape
+ matrix
+ 1 0 -0 0
+ -0 2.22044605e-16 -1 0
+ 0 1 2.22044605e-16 0
+ 0 100.099998 0 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 1
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ screen_window_min -15 -15
+ screen_window_max 15 15
+ exposure 0
+}
+
+ortho_camera
+{
+ name frontShape
+ matrix
+ 1 0 0 0
+ 0 1 0 0
+ 0 0 1 0
+ 0 0 100.099998 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 1
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ screen_window_min -15 -15
+ screen_window_max 15 15
+ exposure 0
+}
+
+ortho_camera
+{
+ name sideShape
+ matrix
+ 2.22044605e-16 0 -1 0
+ 0 1 0 0
+ 1 0 2.22044605e-16 0
+ 100.099998 0 0 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 1
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ screen_window_min -15 -15
+ screen_window_max 15 15
+ exposure 0
+}
+
+persp_camera
+{
+ name TurbulentFlameCameraShape
+ fov 49.1343422
+ focus_distance 1
+ aperture_size 0
+ aperture_blades 0
+ aperture_rotation 0
+ aperture_blade_curvature 0
+ aperture_aspect_ratio 1
+ uv_remap 0 0 0 0
+ matrix
+ 0.954240322 0 -0.299040794 0
+ -0.0577683374 0.981163561 -0.184338987 0
+ 0.293407947 0.193178788 0.936265826 0
+ 2.00973988 0.29294163 6.43993568 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 1
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ screen_window_min -1 -1
+ screen_window_max 1 1
+ exposure 0
+}
+
+skydome_light
+{
+ name aiSkyDomeLightShape1
+ resolution 1000
+ format "latlong"
+ matrix
+ 1 0 0 0
+ 0 1 0 0
+ 0 0 1 0
+ 0 0 0 1
+ color 1 1 1
+ intensity 1
+ exposure 0
+ cast_shadows on
+ cast_volumetric_shadows on
+ shadow_density 1
+ shadow_color 0 0 0
+ samples 1
+ normalize on
+ affect_diffuse on
+ affect_specular on
+ affect_volumetrics on
+ diffuse 1
+ specular 1
+ sss 1
+ indirect 1
+ max_bounces 999
+ volume_samples 2
+}
+
+volume
+{
+ name ArnoldVolumeShape
+ dso "/Users/gatgui/Dev/git/Field3DArnold/release/x64/arnold-4.2.6.1/volume_field3d.dylib"
+ data "-file /Users/gatgui/Dev/git/Field3DArnold/data/f3d/FlameShapeFrame#.f3d -verbose"
+ min 0 0 0
+ max 0 0 0
+ step_size 0
+ visibility 255
+ receive_shadows on
+ self_shadows on
+ matrix
+ 1 0 0 0
+ 0 1 0 0
+ 0 0 1 0
+ 0 0 0 1
+ shader "aiStandard1SG"
+ opaque on
+ matte off
+ id 158897390
+ declare mtoa_shading_groups constant ARRAY NODE
+ mtoa_shading_groups "aiStandard1SG"
+}
+
+gaussian_filter
+{
+ name defaultArnoldFilter@gaussian_filter
+ width 2
+}
+
+driver_exr
+{
+ name defaultArnoldDriver@driver_exr.RGBA.RGBA
+ filename "flame.exr"
+ compression "zip"
+ half_precision off
+ tiled off
+ preserve_layer_name off
+ autocrop off
+ append off
+}
+
+MayaShadingEngine
+{
+ name aiStandard1SG
+ beauty aiStandard1
+ volume aiVolumeCollector1
+ enable_matte off
+ matte_color 0 0 0 0
+}
+
+standard
+{
+ name aiStandard1
+ Kd 0.699999988
+ Kd_color 1 1 1
+ diffuse_roughness 0
+ Ks 0
+ Ks_color 1 1 1
+ specular_roughness 0.4669047
+ specular_anisotropy 0.5
+ specular_rotation 0
+ Kr 0
+ Kr_color 1 1 1
+ reflection_exit_color 0 0 0
+ reflection_exit_use_environment off
+ Kt 0
+ Kt_color 1 1 1
+ transmittance 1 1 1
+ refraction_roughness 0
+ refraction_exit_color 0 0 0
+ refraction_exit_use_environment off
+ IOR 1
+ Kb 0
+ Fresnel off
+ Krn 0
+ specular_Fresnel off
+ Ksn 0
+ Fresnel_use_IOR off
+ Fresnel_affect_diff on
+ emission 0
+ emission_color 1 1 1
+ direct_specular 1
+ indirect_specular 1
+ direct_diffuse 1
+ indirect_diffuse 1
+ enable_glossy_caustics off
+ enable_reflective_caustics off
+ enable_refractive_caustics off
+ enable_internal_reflections on
+ Ksss 0
+ Ksss_color 1 1 1
+ sss_radius 0.100000001 0.100000001 0.100000001
+ bounce_factor 1
+ opacity 1 1 1
+ aov_emission "emission"
+ aov_direct_diffuse "direct_diffuse"
+ aov_direct_specular "direct_specular"
+ aov_indirect_diffuse "indirect_diffuse"
+ aov_indirect_specular "indirect_specular"
+ aov_reflection "reflection"
+ aov_refraction "refraction"
+ aov_refraction_opacity "refraction_opacity"
+ aov_sss "sss"
+}
+
+volume_collector
+{
+ name aiVolumeCollector1
+ scattering_source "parameter"
+ scattering remapValue3.outColor
+ scattering_channel ""
+ scattering_color 1 1 1
+ scattering_intensity 1
+ anisotropy 0
+ attenuation_source "scattering"
+ attenuation 1 1 1
+ attenuation_channel ""
+ attenuation_color 1 1 1
+ attenuation_intensity 1
+ attenuation_mode "absorption"
+ emission_source "parameter"
+ emission remapValue2.outColor
+ emission_channel ""
+ emission_color 1 1 1
+ emission_intensity 30
+ position_offset 0 0 0
+ interpolation "tricubic"
+}
+
+MayaRemapValueToColor
+{
+ name remapValue3.outColor
+ input aiVolumeSampleFloat3
+ inputMin 0
+ inputMax 1
+ positions 2 1 FLOAT
+0.200000003 1
+ values 2 1 RGB
+0 0 0 1 1 1
+ interpolations 2 1 INT
+1 1
+ outputMin 0
+ outputMax 1
+}
+
+volume_sample_float
+{
+ name aiVolumeSampleFloat3
+ channel "density"
+ position_offset 0 0 0
+ interpolation "tricubic"
+ input_min 0
+ input_max 1
+ contrast 1
+ contrast_pivot 0.5
+ bias 0.5
+ gain 0.5
+ output_min 0
+ output_max 1
+ clamp_min off
+ clamp_max off
+}
+
+MayaRemapValueToColor
+{
+ name remapValue2.outColor
+ input aiVolumeSampleFloat2
+ inputMin 0
+ inputMax 1
+ positions 2 1 FLOAT
+1 0.278260857
+ values 2 1 RGB
+1 0.388750017 0.185000002 0 0 0
+ interpolations 2 1 INT
+1 1
+ outputMin 0
+ outputMax 1
+}
+
+volume_sample_float
+{
+ name aiVolumeSampleFloat2
+ channel "temperature"
+ position_offset 0 0 0
+ interpolation "trilinear"
+ input_min 0
+ input_max 1
+ contrast 1
+ contrast_pivot 0.5
+ bias 0.5
+ gain 0.5
+ output_min 0
+ output_max 1
+ clamp_min off
+ clamp_max off
+}
+

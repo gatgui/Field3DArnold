@@ -1,0 +1,18 @@
+
+export ARNOLD_ROOT=/Users/gatgui/solidangle/arnold/4.2.6.2
+export MTOA_ROOT=/Users/gatgui/solidangle/mtoa/1.2.2.0/2013
+export FIELD3D_MAYA=/Users/gatgui/Dev/git/Field3DMaya/release/x64/maya201301
+
+export PATH=$ARNOLD_ROOT/bin:$PATH
+export DYLD_LIBRARY_PATH=$ARNOLD_ROOT/bin:$MTOA_ROOT/bin:$DYLD_LIBRARY_PATH
+
+export ARNOLD_PLUGIN_PATH=$MTOA_ROOT/shaders
+export ARNOLD_PROCEDURAL_PATH=$MTOA_ROOT/procedurals
+
+export PYTHONPATH=$ARNOLD_ROOT/python:$MTOA_ROOT/scripts:$PYTHONPATH
+
+export MAYA_PLUG_IN_PATH=$MTOA_ROOT/plug-ins:$FIELD3D_MAYA/plug-ins:$MAYA_PLUG_IN_PATH
+export XBMLANGPATH=$MTOA_ROOT/icons/%B:$XBMLANGPATH
+export MAYA_RENDER_DESC_PATH=$MTOA_ROOT:$MAYA_RENDER_DESC_PATH
+export MTOA_EXTENTIONS_PATH=
+export MTOA_TEMPLATES_PATH=
