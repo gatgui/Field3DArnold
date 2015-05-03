@@ -30,4 +30,7 @@
 excons.cache
 *.dblite
 .build
+debug
+release
+*.exr
 

@@ -650,7 +650,7 @@ public:
                   
                if (p3 == std::string::npos)
                {
-                  AiMsgError("[f3d] Missing value for %s flag", flag.c_str());
+                  AiMsgError("[volume_field3d] Missing value for %s flag", flag.c_str());
                   reset();
                   return false;
                }
@@ -685,7 +685,7 @@ public:
                {
                   if (inQuotes)
                   {
-                     AiMsgError("[f3d] Missing value for %s flag", flag.c_str());
+                     AiMsgError("[volume_field3d] Missing value for %s flag", flag.c_str());
                      reset();
                      return false;
                   }
@@ -728,22 +728,22 @@ public:
                         if (mtype == "avg")
                         {
                            mChannelsMergeType[channel] = SMT_avg;
-                           AiMsgDebug("[f3d] Using AVG merge for channel \"%s\"", channel.c_str());
+                           AiMsgDebug("[volume_field3d] Using AVG merge for channel \"%s\"", channel.c_str());
                         }
                         else if (mtype == "add")
                         {
                            mChannelsMergeType[channel] = SMT_add;
-                           AiMsgDebug("[f3d] Using ADD merge for channel \"%s\"", channel.c_str());
+                           AiMsgDebug("[volume_field3d] Using ADD merge for channel \"%s\"", channel.c_str());
                         }
                         else if (mtype == "max")
                         {
                            mChannelsMergeType[channel] = SMT_max;
-                           AiMsgDebug("[f3d] Using MAX merge for channel \"%s\"", channel.c_str());
+                           AiMsgDebug("[volume_field3d] Using MAX merge for channel \"%s\"", channel.c_str());
                         }
                         else if (mtype == "min")
                         {
                            mChannelsMergeType[channel] = SMT_min;
-                           AiMsgDebug("[f3d] Using MIN merge for channel \"%s\"", channel.c_str());
+                           AiMsgDebug("[volume_field3d] Using MIN merge for channel \"%s\"", channel.c_str());
                         }
                      }
                      
@@ -768,7 +768,7 @@ public:
                }
                else
                {
-                  AiMsgError("[f3d] Invalid value for -frame: %s", arg.c_str());
+                  AiMsgError("[volume_field3d] Invalid value for -frame: %s", arg.c_str());
                }
                
                p0 = (p4 != std::string::npos ? p4 + 1 : p4);
@@ -787,7 +787,7 @@ public:
             }
             else
             {
-               AiMsgError("[f3d] Invalid flag \"%s\"", flag.c_str());
+               AiMsgError("[volume_field3d] Invalid flag \"%s\"", flag.c_str());
                reset();
                return false;
             }
@@ -808,7 +808,7 @@ public:
             }
             else
             {
-               AiMsgError("[f3d] Unknown flag \"%s\"", flag.c_str());
+               AiMsgError("[volume_field3d] Unknown flag \"%s\"", flag.c_str());
                reset();
                return false;
             }
@@ -825,7 +825,7 @@ public:
          if (remain.find_first_not_of(" \t\n") != std::string::npos)
          {
             // No more flag left in string
-            AiMsgError("[f3d] Invalid parameter string (cannot parse \"%s\")", remain.c_str());
+            AiMsgError("[volume_field3d] Invalid parameter string (cannot parse \"%s\")", remain.c_str());
             reset();
             return false;
          }
@@ -863,22 +863,22 @@ public:
                if (mtype == "avg")
                {
                   mChannelsMergeType[channel] = SMT_avg;
-                  AiMsgDebug("[f3d] Using AVG merge for channel \"%s\"", channel.c_str());
+                  AiMsgDebug("[volume_field3d] Using AVG merge for channel \"%s\"", channel.c_str());
                }
                else if (mtype == "add")
                {
                   mChannelsMergeType[channel] = SMT_add;
-                  AiMsgDebug("[f3d] Using ADD merge for channel \"%s\"", channel.c_str());
+                  AiMsgDebug("[volume_field3d] Using ADD merge for channel \"%s\"", channel.c_str());
                }
                else if (mtype == "max")
                {
                   mChannelsMergeType[channel] = SMT_max;
-                  AiMsgDebug("[f3d] Using MAX merge for channel \"%s\"", channel.c_str());
+                  AiMsgDebug("[volume_field3d] Using MAX merge for channel \"%s\"", channel.c_str());
                }
                else if (mtype == "min")
                {
                   mChannelsMergeType[channel] = SMT_min;
-                  AiMsgDebug("[f3d] Using MIN merge for channel \"%s\"", channel.c_str());
+                  AiMsgDebug("[volume_field3d] Using MIN merge for channel \"%s\"", channel.c_str());
                }
             }
          }
@@ -949,7 +949,7 @@ public:
                
                if (sscanf(pads.c_str(), "%d", &pad) != 1)
                {
-                  AiMsgWarning("[f3d] Invalid <frame> token format: %s. Assume no padding", basename.substr(p0, p2-p1+1).c_str());
+                  AiMsgWarning("[volume_field3d] Invalid <frame> token format: %s. Assume no padding", basename.substr(p0, p2-p1+1).c_str());
                   pad = 0;
                }
                
@@ -1012,7 +1012,7 @@ public:
          
       if (basename == tmp)
       {
-         AiMsgWarning("[f3d] No frame pattern in file name: \"%s\"", basename.c_str());
+         AiMsgWarning("[volume_field3d] No frame pattern in file name: \"%s\"", basename.c_str());
       }
       else
       {
@@ -1030,7 +1030,7 @@ public:
       
       if (mVerbose)
       {
-         AiMsgInfo("[f3d] Using %s", mPath.c_str());
+         AiMsgInfo("[volume_field3d] Using %s", mPath.c_str());
       }
       
       if (!noSetup)
@@ -1070,8 +1070,8 @@ public:
          
          if (mVerbose)
          {
-            AiMsgInfo("[f3d] Add %s channel '%s.%s[%lu]'", isVector ? "vector" : "scalar", partition.c_str(), layer.c_str(), fd.partitionIndex);
-            AiMsgInfo("[f3d]   also accessible as: '%s.%s', '%s[%lu]' and '%s'", partition.c_str(), layer.c_str(), layer.c_str(), fd.globalIndex, layer.c_str());
+            AiMsgInfo("[volume_field3d] Add %s channel '%s.%s[%lu]'", isVector ? "vector" : "scalar", partition.c_str(), layer.c_str(), fd.partitionIndex);
+            AiMsgInfo("[volume_field3d]   also accessible as: '%s.%s', '%s[%lu]' and '%s'", partition.c_str(), layer.c_str(), layer.c_str(), fd.globalIndex, layer.c_str());
          }
          
          { // partition.field[index]
@@ -1108,7 +1108,7 @@ public:
    {
       if (mVerbose)
       {
-         AiMsgInfo("[f3d] Open file: %s", mPath.c_str());
+         AiMsgInfo("[volume_field3d] Open file: %s", mPath.c_str());
       }
       
       mF3DFile = new Field3D::Field3DInputFile();
@@ -1231,7 +1231,7 @@ public:
          {
             if (mVerbose)
             {
-               AiMsgInfo("[f3d] No changes in fields to be read");
+               AiMsgInfo("[volume_field3d] No changes in fields to be read");
             }
             
             mNode = node;
@@ -1294,9 +1294,9 @@ public:
          
          Field3D::V3d bmin(0.0, 0.0, 0.0);
          Field3D::V3d bmax(1.0, 1.0, 1.0);
-         Field3D::V3d lstep(1.0 / double(res.x),
-                            1.0 / double(res.y),
-                            1.0 / double(res.z));
+         Field3D::V3d lstep(0.5 / double(res.x),
+                            0.5 / double(res.y),
+                            0.5 / double(res.z));
          Field3D::V3d step;
          Field3D::Box3d b;
          
@@ -1361,6 +1361,9 @@ public:
    void rayExtents(const AtVolumeIntersectionInfo *info, AtByte tid, float time, const AtPoint *origin, const AtVector *direction, float t0, float t1)
    {
       // Note: time is not used...
+      #ifdef _DEBUG
+      AiMsgDebug("[volume_field3d] Compute ray extents...");
+      #endif
       
       typedef std::pair<float, float> Extent;
       typedef std::vector<Extent> Extents;
@@ -1377,16 +1380,25 @@ public:
       
       Extents extents;
       
-      AiMsgDebug("[f3d]   Origin: (%f, %f, %f)", wray.pos.x, wray.pos.y, wray.pos.z);
-      AiMsgDebug("[f3d]   Direction: (%f, %f, %f)", wray.dir.x, wray.dir.y, wray.dir.z);
-      AiMsgDebug("[f3d]   Range: %f -> %f", t0, t1);
+      #ifdef _DEBUG
+      AiMsgDebug("[volume_field3d]   Origin: (%f, %f, %f)", wray.pos.x, wray.pos.y, wray.pos.z);
+      AiMsgDebug("[volume_field3d]   Direction: (%f, %f, %f)", wray.dir.x, wray.dir.y, wray.dir.z);
+      AiMsgDebug("[volume_field3d]   Range: %f -> %f", t0, t1);
+      #endif
       
       for (size_t i=0; i<mFields.size(); ++i)
       {
          FieldData &fd = mFields[i];
          
+         #ifdef _DEBUG
+         AiMsgDebug("[volume_field3d]   Process field %s.%s[%lu]", fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex);
+         #endif
+         
          if (!fd.base)
          {
+            #ifdef _DEBUG
+            AiMsgDebug("[volume_field3d]     Skip invalid field");
+            #endif
             continue;
          }
          
@@ -1418,21 +1430,20 @@ public:
             }
             else
             {
-               AiMsgWarning("[f3d]     Null direction vector in local space");
+               AiMsgWarning("[volume_field3d] Null direction vector in local space");
                continue;
             }
             
-            AiMsgDebug("[f3d]     Local space origin: (%f, %f, %f)", ray.pos.x, ray.pos.y, ray.pos.z);
-            AiMsgDebug("[f3d]     Local space direction: (%f, %f, %f)", ray.dir.x, ray.dir.y, ray.dir.z);
+            #ifdef _DEBUG
+            AiMsgDebug("[volume_field3d]     Local space origin: (%f, %f, %f)", ray.pos.x, ray.pos.y, ray.pos.z);
+            AiMsgDebug("[volume_field3d]     Local space direction: (%f, %f, %f)", ray.dir.x, ray.dir.y, ray.dir.z);
+            #endif
          }
          else
          {
             ray.pos = wray.pos;
             ray.dir = wray.dir;
          }
-         
-         AiMsgDebug("[f3d]     Bounding box min: (%f, %f, %f)", box.min.x, box.min.y, box.min.z);
-         AiMsgDebug("[f3d]     Bounding box max: (%f, %f, %f)", box.max.x, box.max.y, box.max.z);
          
          Field3D::V3d in, out;
          
@@ -1451,10 +1462,18 @@ public:
             fd.base->mapping()->localToWorld(_out, out);
          }
          
-         extent.first = (in - wray.pos).length();
-         extent.second = (out - wray.pos).length();
+         extent.first = (in - wray.pos).dot(wray.dir);
+         extent.second = (out - wray.pos).dot(wray.dir);
          
-         AiMsgDebug("[f3d]     Extents: %f -> %f", extent.first, extent.second);
+         if (extent.second < 0)
+         {
+            // findEntryAndExitPoints can return intersections 'behind'
+            continue;
+         }
+         
+         #ifdef _DEBUG
+         AiMsgDebug("[volume_field3d]     Extents: %f -> %f", extent.first, extent.second);
+         #endif
          
          if (extent.first < extent.second)
          {
@@ -1564,10 +1583,6 @@ public:
                }
             }
          }
-         else
-         {
-            // doesn't intersect
-         }
       }
       
       if (!info)
@@ -1577,14 +1592,22 @@ public:
       
       for (size_t i=0; i<extents.size(); ++i)
       {
+         #ifdef _DEBUG
+         AiMsgDebug("[volume_field3d] Add extent: %f -> %f", extents[i].first, extents[i].second);
+         #endif
          AiVolumeAddIntersection(info, extents[i].first, extents[i].second);
       }
    }
    
    bool sample(const char *channel, const AtShaderGlobals *sg, int interp, AtParamValue *value, AtByte *type)
    {
+      #ifdef _DEBUG
+      AiMsgDebug("[volume_field3d] Sample channel \"%s\"", channel);
+      #endif
+      
       if (!sg || !value || !type)
       {
+         AiMsgWarning("[volume_field3d] Invalid inputs");
          return false;
       }
       
@@ -1608,12 +1631,21 @@ public:
       {
          std::vector<size_t> &indices = it->second;
          
+         if (indices.size() == 0)
+         {
+            AiMsgWarning("[volume_field3d] No field indices for channel \"%s\"", channel);
+         }
+         
          for (size_t i=0; i<indices.size(); ++i)
          {
             FieldData &fd = mFields[indices[i]];
             
             if (fd.base)
             {
+               #ifdef _DEBUG
+               AiMsgDebug("[volume_field3d] Sample field %s.%s[%lu]", fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex);
+               #endif
+               
                // check if inside nox
                Field3D::V3d Pw(sg->Po.x, sg->Po.y, sg->Po.z);
                Field3D::V3d Pl;
@@ -1630,23 +1662,27 @@ public:
                   fd.base->mapping()->worldToVoxel(Pw, Pv);
                }
                
-               if (!unitCube.intersects(Pl))
-               {
-                  // Not inside volume. Default value?
-               }
-               else
+               if (unitCube.intersects(Pl))
                {
                   if (fd.sample(Pv, interp, mergeType, value, type))
                   {
                      ++hitCount;
                   }
                }
+               else
+               {
+                  // Not inside volume. Set a default value?
+               }
+            }
+            else
+            {
+               AiMsgWarning("[volume_field3d] Invalid field %s.%s[%lu]", fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex);
             }
          }
       }
       else
       {
-         AiMsgWarning("[f3d] No channel \"%s\" in file \"%s\"", channel, mPath.c_str());
+         AiMsgWarning("[volume_field3d] No channel \"%s\" in file \"%s\"", channel, mPath.c_str());
       }
       
       if (hitCount > 1 && mergeType == SMT_avg)
@@ -1725,6 +1761,7 @@ bool F3D_CreateVolume(void *user_ptr, const char *user_string, const AtNode *nod
    }
    else
    {
+      AiMsgWarning("[volume_field3d] Failed to initialize volume data");
       data->bbox.min = AI_P3_ZERO;
       data->bbox.max = AI_P3_ZERO;
       data->auto_step_size = std::numeric_limits<float>::max();
@@ -1835,7 +1872,7 @@ int main(int argc, char **argv)
    
    if (!F3D_Init(&user_ptr))
    {
-      AiMsgError("[f3d] F3D_Init failed");
+      AiMsgError("[volume_field3d] F3D_Init failed");
    }
    else
    {
@@ -1850,10 +1887,10 @@ int main(int argc, char **argv)
       
       if (F3D_CreateVolume(user_ptr, args.c_str(), node, &data))
       {
-         AiMsgInfo("[f3d] Auto step size = %f", data.auto_step_size);
+         AiMsgInfo("[volume_field3d] Auto step size = %f", data.auto_step_size);
          
-         AiMsgInfo("[f3d] Bounding box min = (%f, %f, %f)", data.bbox.min.x, data.bbox.min.y, data.bbox.min.z);
-         AiMsgInfo("[f3d] Bounding box max = (%f, %f, %f)", data.bbox.max.x, data.bbox.max.y, data.bbox.max.z);
+         AiMsgInfo("[volume_field3d] Bounding box min = (%f, %f, %f)", data.bbox.min.x, data.bbox.min.y, data.bbox.min.z);
+         AiMsgInfo("[volume_field3d] Bounding box max = (%f, %f, %f)", data.bbox.max.x, data.bbox.max.y, data.bbox.max.z);
          
          F3D_RayExtents(user_ptr, &data, (const AtVolumeIntersectionInfo*)0, tid, t, &origin, &direction, t0, t1);
          
@@ -1870,15 +1907,15 @@ int main(int argc, char **argv)
          
          if (outType == AI_TYPE_FLOAT)
          {
-            AiMsgInfo("[f3d] FLT = %f", outValue.FLT);
+            AiMsgInfo("[volume_field3d] FLT = %f", outValue.FLT);
          }
          else if (outType == AI_TYPE_VECTOR)
          {
-            AiMsgInfo("[f3d] VEC = %f, %f, %f", outValue.VEC.x, outValue.VEC.y, outValue.VEC.z);
+            AiMsgInfo("[volume_field3d] VEC = %f, %f, %f", outValue.VEC.x, outValue.VEC.y, outValue.VEC.z);
          }
          else
          {
-            AiMsgInfo("[f3d] Unsupported output type");
+            AiMsgInfo("[volume_field3d] Unsupported output type");
          }
          
          AiShaderGlobalsDestroy(sg);
@@ -1887,7 +1924,7 @@ int main(int argc, char **argv)
       }
       else
       {
-         AiMsgError("[f3d] F3D_CreateVolume failed");
+         AiMsgError("[volume_field3d] F3D_CreateVolume failed");
       }
       
       F3D_Cleanup(user_ptr);
