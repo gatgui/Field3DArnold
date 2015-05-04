@@ -40,15 +40,15 @@ enum SampleMergeType
    SMT_add = 0,
    SMT_max,
    SMT_min,
-   SMT_avg,
+   SMT_average,
    SMT_unknown
 };
 
-static SampleMergeType MergeTypeFromString(const std::string &s)
+static SampleMergeType SampleMergeTypeFromString(const std::string &s)
 {
-   if (s == "avg")
+   if (s == "average")
    {
-      return SMT_avg;
+      return SMT_average;
    }
    else if (s == "add")
    {
@@ -68,12 +68,12 @@ static SampleMergeType MergeTypeFromString(const std::string &s)
    }
 }
 
-static const char* MergeTypeToString(SampleMergeType t)
+static const char* SampleMergeTypeToString(SampleMergeType t)
 {
    switch (t)
    {
-   case SMT_avg:
-      return "avg";
+   case SMT_average:
+      return "average";
    case SMT_min:
       return "min";
    case SMT_max:
@@ -84,6 +84,50 @@ static const char* MergeTypeToString(SampleMergeType t)
       return "";
    }
 }
+
+enum ShutterTimeType
+{
+   STT_normalized = 0,
+   STT_frame_relative,
+   STT_absolute_frame,
+   STT_unknown
+};
+
+static ShutterTimeType ShutterTimeTypeFromString(const std::string &s)
+{
+   if (s == "normalized")
+   {
+      return STT_normalized;
+   }
+   else if (s == "frame_relative")
+   {
+      return STT_frame_relative;
+   }
+   else if (s == "absolute_frame")
+   {
+      return STT_absolute_frame;
+   }
+   else
+   {
+      return STT_unknown;
+   }
+}
+
+static const char* ShutterTimeTypeToString(ShutterTimeType t)
+{
+   switch (t)
+   {
+   case STT_normalized:
+      return "normalized";
+   case STT_frame_relative:
+      return "frame_relative";
+   case STT_absolute_frame:
+      return "absolute_frame";
+   default:
+      return "";
+   }
+}
+
 
 template <typename ValueType> struct ArnoldType { enum { Value = AI_TYPE_UNDEFINED }; };
 template <> struct ArnoldType<Field3D::half> { enum { Value = AI_TYPE_FLOAT }; };
@@ -117,7 +161,7 @@ struct ArnoldValue<ValueType, AI_TYPE_FLOAT>
          case SMT_min:
             outValue->FLT = std::min(outValue->FLT, float(val));
             break;
-         case SMT_avg:
+         case SMT_average:
          case SMT_add:
          default:
             outValue->FLT += float(val);
@@ -153,7 +197,7 @@ struct ArnoldValue<FIELD3D_VEC3_T<DataType>, AI_TYPE_VECTOR>
             outValue->VEC.y = std::min(outValue->VEC.y, float(val.y));
             outValue->VEC.z = std::min(outValue->VEC.z, float(val.z));
             break;
-         case SMT_avg:
+         case SMT_average:
          case SMT_add:
          default:
             outValue->VEC.x += float(val.x);
@@ -584,6 +628,12 @@ public:
       , mF3DFile(0)
       , mIgnoreTransform(false)
       , mVerbose(false)
+      , mFrame(1.0f)
+      , mFPS(24.0f)
+      , mVelocityScale(1.0f)
+      , mMotionStartFrame(1.0f)
+      , mMotionEndFrame(1.0f)
+      , mShutterTimeType(STT_normalized)
    {
    }
    
@@ -599,6 +649,13 @@ public:
       mPartition = "";
       mIgnoreTransform = false;
       mVerbose = false;
+      mFrame = 1.0f;
+      mFPS = 24.0f;
+      mVelocityScale = 1.0f;
+      mMotionStartFrame = mFrame;
+      mMotionEndFrame = mFrame;
+      mShutterTimeType = STT_normalized;
+      mVelocityFields.clear();
       
       mFields.clear();
       mFieldIndices.clear();
@@ -626,6 +683,14 @@ public:
       //   mIgnoreTransform 
       //   mVerbose
       //   mChannelsMergeType
+      //   mFPS
+      //   mVelocityFields
+      //   mVelocityScale
+      //   mMotionStartFrame
+      //   mMotionEndFrame
+      //   mShutterTimeType
+      // 
+      // mFrame influences mPath
       //
       // Derived from mPath and mPartition
       //   mFields
@@ -638,15 +703,22 @@ public:
    {
       reset();
       
-      float frame = 1.0f;
       std::vector<std::string> mergeTypes;
+      std::vector<std::string> velocityFields;
+      std::string shutterTimeType;
+      bool hasMotionStart = false;
+      bool hasMotionEnd = false;
       
       // Figure out frame default value from options node
       AtNode *opts = AiUniverseGetOptions();
       
-      if (readFloatUserAttr(opts, "frame", frame))
+      if (readFloatUserAttr(opts, "frame", mFrame))
       {
          AiMsgDebug("[volume_field3d] 'frame' read from options node");
+      }
+      if (readFloatUserAttr(opts, "fps", mFPS))
+      {
+         AiMsgDebug("[volume_field3d] 'fps' read from options node");
       }
       
       // Read params from string data
@@ -704,7 +776,7 @@ public:
                
                if (sscanf(args[i].c_str(), "%f", &farg) == 1)
                {
-                  frame = farg;
+                  mFrame = farg;
                }
                else
                {
@@ -712,15 +784,158 @@ public:
                }
             }
          }
-         else if (arg == "-merge")
+         else if (arg == "-fps")
          {
             if (++i >= args.size())
             {
-               AiMsgWarning("[volume_field] -merge flag expects at least 2 arguments");
+               AiMsgWarning("[volume_field3d] -fps flag expects an argument");
             }
             else
             {
-               splitString(args[i], ';', true, mergeTypes);
+               float farg = 0.0f;
+               
+               if (sscanf(args[i].c_str(), "%f", &farg) == 1)
+               {
+                  mFPS = farg;
+               }
+               else
+               {
+                  AiMsgWarning("[volume_field3d] -fps flag expects a float argument");
+               }
+            }
+         }
+         else if (arg == "-velocityField")
+         {
+            ++i;
+            
+            while (i < args.size())
+            {
+               if (args[i].length() > 0)
+               {
+                  if (args[i][0] == '-')
+                  {
+                     // found a flag
+                     --i;
+                     break;
+                  }
+                  else
+                  {
+                     velocityFields.push_back(args[i]);
+                  }
+               }
+               ++i;
+            }
+            
+            if (velocityFields.size() == 1 || velocityFields.size() == 3)
+            {
+               std::swap(velocityFields, mVelocityFields);
+            }
+            else
+            {
+               AiMsgWarning("[volume_field3d] -velocityField expects 1 or 3 field names");
+            }
+         }
+         else if (arg == "-velocityScale")
+         {
+            if (++i >= args.size())
+            {
+               AiMsgWarning("[volume_field3d] -velocityScale flag expects an argument");
+            }
+            else
+            {
+               float farg = 0.0f;
+               
+               if (sscanf(args[i].c_str(), "%f", &farg) == 1)
+               {
+                  mVelocityScale = farg;
+               }
+               else
+               {
+                  AiMsgWarning("[volume_field3d] -velocityScale flag expects a float argument");
+               }
+            }
+         }
+         else if (arg == "-motionStartFrame")
+         {
+            if (++i >= args.size())
+            {
+               AiMsgWarning("[volume_field3d] -motionStartFrame flag expects an argument");
+            }
+            else
+            {
+               float farg = 0.0f;
+               
+               if (sscanf(args[i].c_str(), "%f", &farg) == 1)
+               {
+                  mMotionStartFrame = farg;
+                  hasMotionStart = true;
+               }
+               else
+               {
+                  AiMsgWarning("[volume_field3d] -motionStartFrame flag expects a float argument");
+               }
+            }
+         }
+         else if (arg == "-motionEndFrame")
+         {
+            if (++i >= args.size())
+            {
+               AiMsgWarning("[volume_field3d] -motionEndFrame flag expects an argument");
+            }
+            else
+            {
+               float farg = 0.0f;
+               
+               if (sscanf(args[i].c_str(), "%f", &farg) == 1)
+               {
+                  mMotionEndFrame = farg;
+                  hasMotionEnd = true;
+               }
+               else
+               {
+                  AiMsgWarning("[volume_field3d] -motionEndFrame flag expects a float argument");
+               }
+            }
+         }
+         else if (arg == "-shutterTimeType")
+         {
+            if (++i >= args.size())
+            {
+               AiMsgWarning("[volume_field3d] -shutterTimeType flag expects an argument");
+            }
+            else
+            {
+               ShutterTimeType stt = ShutterTimeTypeFromString(args[i]);
+               if (stt != STT_unknown)
+               {
+                  mShutterTimeType = stt;
+               }
+               else
+               {
+                  AiMsgWarning("[volume_field3d] Invalid value for -shutterTimeType. Should be one of 'normalized', 'frame_relative' or 'absolute_frame'");
+               }
+            }
+         }
+         else if (arg == "-merge")
+         {
+            ++i;
+            
+            while (i < args.size())
+            {
+               if (args[i].length() > 0)
+               {
+                  if (args[i][0] == '-')
+                  {
+                     // found a flag
+                     --i;
+                     break;
+                  }
+                  else
+                  {
+                     mergeTypes.push_back(args[i]);
+                  }
+               }
+               ++i;
             }
          }
          else if (arg == "-verbose")
@@ -746,13 +961,56 @@ public:
       {
          AiMsgDebug("[volume_field3d] User attribute 'partition' found. '-partition' flag overridden");
       }
-      if (readStringArrayUserAttr(node, "merge", ';', true, mergeTypes))
+      if (readStringArrayUserAttr(node, "merge", ' ', true, mergeTypes))
       {
          AiMsgDebug("[volume_field3d] User attribute 'merge' found. '-merge' flag overridden");
       }
-      if (readFloatUserAttr(node, "frame", frame))
+      if (readFloatUserAttr(node, "frame", mFrame))
       {
          AiMsgDebug("[volume_field3d] User attribute 'frame' found. '-frame' flag overridden");
+      }
+      if (readFloatUserAttr(node, "fps", mFPS))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'fps' found. '-fps' flag overridden");
+      }
+      if (readFloatUserAttr(node, "motionStartFrame", mMotionStartFrame))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'motionStartFrame' found. '-motionStartFrame' flag overridden");
+         hasMotionStart = true;
+      }
+      if (readFloatUserAttr(node, "motionEndFrame", mMotionEndFrame))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'motionEndFrame' found. '-motionEndFrame' flag overridden");
+         hasMotionEnd = true;
+      }
+      if (readFloatUserAttr(node, "velocityScale", mVelocityScale))
+      {
+         AiMsgDebug("[volume_field3d] User attribute 'velocityScale' found. '-velocityScale' flag overridden");
+      }
+      if (readStringArrayUserAttr(node, "velocityField", ' ', true, velocityFields))
+      {
+         if (velocityFields.size() != 1 && velocityFields.size() != 3)
+         {
+            AiMsgDebug("[volume_field3d] User attribute 'velocityField' found but invalid specification (expected 1 or 3 names)");
+         }
+         else
+         {
+            AiMsgDebug("[volume_field3d] User attribute 'velocityField' found. '-velocityField' flag overridden");
+            std::swap(velocityFields, mVelocityFields);
+         }
+      }
+      if (readStringUserAttr(node, "shutterTimeType", shutterTimeType))
+      {
+         ShutterTimeType stt = ShutterTimeTypeFromString(shutterTimeType);
+         if (stt != STT_unknown)
+         {
+            AiMsgDebug("[volume_field3d] User attribute 'shutterTimeType' found. '-shutterTimeType' flag overridden");
+            mShutterTimeType = stt;
+         }
+         else
+         {
+            AiMsgWarning("[volume_field3d] Invalid value for shutterTimeType attribute. Should be one of 'normalized', 'frame_relative' or 'absolute_frame'");
+         }
       }
       if (readBoolUserAttr(node, "ignoreXform", mIgnoreTransform))
       {
@@ -773,32 +1031,60 @@ public:
          if (p != std::string::npos)
          {
             std::string channel = md.substr(0, p);
-            SampleMergeType mtype = MergeTypeFromString(md.substr(p + 1));
+            SampleMergeType mtype = SampleMergeTypeFromString(md.substr(p + 1));
             
             if (channel.length() > 0 && mtype != SMT_unknown)
             {
                mChannelsMergeType[channel] = mtype;
-               AiMsgDebug("[volume_field3d] Using %s merge for channel \"%s\"", MergeTypeToString(mtype), channel.c_str());
+               AiMsgDebug("[volume_field3d] Using %s merge for channel \"%s\"", SampleMergeTypeToString(mtype), channel.c_str());
             }
          }
       }
       
       #ifdef _DEBUG
-      AiMsgDebug("[volume_field3d] Parameters:")
+      AiMsgDebug("[volume_field3d] Parameters:");
       AiMsgDebug("[volume_field3d]   path = '%s'", mPath.c_str());
       AiMsgDebug("[volume_field3d]   partition = '%s'", mPartition.c_str());
-      AiMsgDebug("[volume_field3d]   frame = %f", frame);
-      AiMsgDebug("[volume_field3d]   ignore transform = %s", mIgnoreTransform ? "true" : "false");
-      AiMsgDebug("[volume_field3d]   verbose = %s", mVerbose ? "true" : "false");
+      AiMsgDebug("[volume_field3d]   frame = %f", mFrame);
+      AiMsgDebug("[volume_field3d]   fps = %f", mFPS);
+      for (size_t i=0; i<mVelocityFields.size(); ++i)
+      {
+         AiMsgDebug("[volume_field3d]   velocity field %lu = '%s'", i, mVelocityFields[i].c_str());
+      }
+      AiMsgDebug("[volume_field3d]   velocity scale = %f", mVelocityScale);
+      AiMsgDebug("[volume_field3d]   motion start frame = %f", mMotionStartFrame);
+      AiMsgDebug("[volume_field3d]   motion end frame = %f", mMotionEndFrame);
+      AiMsgDebug("[volume_field3d]   shutter time type = %s", ShutterTimeTypeToString(mShutterTimeType));
       for (std::map<std::string, SampleMergeType>::iterator mtit=mChannelsMergeType.begin(); mtit!=mChannelsMergeType.end(); ++mtit)
       {
-         AiMsgDebug("[volume_field3d]   '%s' channel merge = %s", mtit->first.c_str(), MergeTypeToString(mtit->second));
+         AiMsgDebug("[volume_field3d]   '%s' channel merge = %s", mtit->first.c_str(), SampleMergeTypeToString(mtit->second));
       }
+      AiMsgDebug("[volume_field3d]   ignore transform = %s", mIgnoreTransform ? "true" : "false");
+      AiMsgDebug("[volume_field3d]   verbose = %s", mVerbose ? "true" : "false");
       #endif
+      
+      // setup motion start/end
+      if (!hasMotionStart)
+      {
+         mMotionStartFrame = mFrame;
+      }
+      if (!hasMotionEnd)
+      {
+         mMotionEndFrame = mFrame;
+      }
+      if (mMotionEndFrame < mMotionStartFrame)
+      {
+         mMotionEndFrame = mMotionStartFrame;
+      }
+      
+      if (mFPS < AI_EPSILON)
+      {
+         mFPS = AI_EPSILON;
+      }
       
       // Replace frame in path (if necessary)
       // allow ###, %03d, or yet <frame> and <frame:pad> tokens in file path
-      int iframe = int(floorf(frame));
+      int iframe = int(floorf(mFrame));
       
       size_t p0 = mPath.find_last_of("\\/");
       size_t p1;
@@ -1055,7 +1341,14 @@ public:
             mNode = node;
             mIgnoreTransform = tmp.mIgnoreTransform;
             mVerbose = tmp.mVerbose;
+            mFrame = tmp.mFrame;
+            mFPS = tmp.mFPS;
+            mVelocityScale = tmp.mVelocityScale;
+            mMotionStartFrame = tmp.mMotionStartFrame;
+            mMotionEndFrame = tmp.mMotionEndFrame;
+            mShutterTimeType = tmp.mShutterTimeType;
             std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
+            std::swap(mVelocityFields, tmp.mVelocityFields);
             
             rv = true;
          }
@@ -1069,6 +1362,14 @@ public:
                std::swap(mPartition, tmp.mPartition);
                std::swap(mIgnoreTransform, tmp.mIgnoreTransform);
                std::swap(mVerbose, tmp.mVerbose);
+               std::swap(mFrame, tmp.mFrame);
+               std::swap(mFPS, tmp.mFPS);
+               std::swap(mVelocityScale, tmp.mVelocityScale);
+               std::swap(mMotionStartFrame, tmp.mMotionStartFrame);
+               std::swap(mMotionEndFrame, tmp.mMotionEndFrame);
+               std::swap(mShutterTimeType, tmp.mShutterTimeType);
+               std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
+               std::swap(mVelocityFields, tmp.mVelocityFields);
                std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
                std::swap(mFieldIndices, tmp.mFieldIndices);
                std::swap(mFields, tmp.mFields);
@@ -1180,7 +1481,7 @@ public:
    {
       // Note: time is not used...
       #ifdef _DEBUG
-      AiMsgDebug("[volume_field3d] Compute ray extents...");
+      AiMsgDebug("[volume_field3d] Compute ray extents (t=%f)...", time);
       #endif
       
       typedef std::pair<float, float> Extent;
@@ -1438,6 +1739,10 @@ public:
       
       int hitCount = 0;
       
+      size_t nvf = mVelocityFields.size();
+      float vscl = secondsFromFrame(sg->time) * mVelocityScale;
+      bool ignoreMb = ((fabsf(vscl) < AI_EPSILON) || (nvf != 1 && nvf != 3));
+      
       *type = AI_TYPE_UNDEFINED;
       
       FieldIndices::iterator it = mFieldIndices.find(channel);
@@ -1465,6 +1770,27 @@ public:
                Field3D::V3d Pw(sg->Po.x, sg->Po.y, sg->Po.z);
                Field3D::V3d Pl;
                Field3D::V3d Pv;
+               
+               if (!ignoreMb)
+               {
+                  // Get velocity
+                  // 
+                  // using:
+                  //   same partition name
+                  //   velocity field name
+                  //   same partition index
+                  // mVelocityFields
+                  if (nvf == 1)
+                  {
+                     // read a single VECTOR field
+                  }
+                  else
+                  {
+                     // read 3 FLOAT fields: X, Y, Z
+                  }
+                  
+                  // in which space is velocity expressed? which units?
+               }
                
                if (mIgnoreTransform)
                {
@@ -1503,7 +1829,7 @@ public:
          AiMsgWarning("[volume_field3d] No channel \"%s\" in file \"%s\"", channel, mPath.c_str());
       }
       
-      if (hitCount > 1 && mergeType == SMT_avg)
+      if (hitCount > 1 && mergeType == SMT_average)
       {
          // averaging results
          float scl = 1.0f / float(hitCount);
@@ -1524,6 +1850,29 @@ public:
    }
 
 private:
+   
+   float secondsFromFrame(float shutterTime)
+   {
+      float shutterFrame = mFrame;
+      
+      if (mShutterTimeType == STT_normalized)
+      {
+         if (mMotionEndFrame > mMotionStartFrame)
+         {
+            shutterFrame = mMotionStartFrame + shutterTime * (mMotionEndFrame - mMotionStartFrame);
+         }
+      }
+      else if (mShutterTimeType == STT_frame_relative)
+      {
+         shutterFrame = mFrame + shutterTime;
+      }
+      else if (mShutterTimeType == STT_absolute_frame)
+      {
+         shutterFrame = shutterTime;
+      }
+      
+      return (shutterFrame - mFrame) / mFPS;
+   }
    
    template <typename DataType>
    void addFields(const std::string &partition, const std::string &layer,
@@ -1853,6 +2202,13 @@ private:
    bool mIgnoreTransform;
    bool mVerbose;
    std::map<std::string, SampleMergeType> mChannelsMergeType;
+   float mFrame;
+   float mFPS;
+   std::vector<std::string> mVelocityFields;
+   float mVelocityScale;
+   float mMotionStartFrame; // relative to mFrame
+   float mMotionEndFrame; // relative to mFrame
+   ShutterTimeType mShutterTimeType;
    
    FieldIndices mFieldIndices;
    Fields mFields;
