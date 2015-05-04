@@ -382,6 +382,7 @@ struct FieldData
    ScalarFieldData scalar;
    VectorFieldData vector;
    
+   FieldData *velocityField[3];
    
    bool setup(Field3D::FieldRes::Ptr baseField, FieldDataType dt, bool vec)
    {
@@ -389,6 +390,9 @@ struct FieldData
       dataType = FDT_unknown;
       isVector = false;
       base = 0;
+      velocityField[0] = 0;
+      velocityField[1] = 0;
+      velocityField[2] = 0;
       
       if (vec)
       {
@@ -1318,7 +1322,88 @@ public:
             }
          }
          
+         setupVelocityFields();
+         
          return true;
+      }
+   }
+   
+   void setupVelocityFields()
+   {
+      for (size_t i=0; i<mFields.size(); ++i)
+      {
+         FieldData &fd = mFields[i];
+         
+         fd.velocityField[0] = 0;
+         fd.velocityField[1] = 0;
+         fd.velocityField[2] = 0;
+      }
+      
+      if (mVelocityFields.size() > 3)
+      {
+         return;
+      }
+      
+      for (size_t i=0; i<mVelocityFields.size(); ++i)
+      {
+         FieldIndices::iterator it = mFieldIndices.find(mVelocityFields[i]);
+         
+         if (it == mFieldIndices.end())
+         {
+            AiMsgWarning("[volume_field3d] No such field '%s'", mVelocityFields[i].c_str());
+            continue;
+         }
+         
+         std::vector<size_t> &indices = it->second;
+         // Note: indices are sorted
+         size_t ii = 0;
+         
+         for (size_t j=0; j<mFields.size(); ++j)
+         {
+            if (j == indices[ii])
+            {
+               // field j is a velocity field
+               AiMsgDebug("[volume_field3d] Skip velocity field %s.%s[%lu]",
+                          mFields[j].partition.c_str(), mFields[j].name.c_str(), mFields[j].partitionIndex);
+               ++ii;
+               continue;
+            }
+            
+            FieldData &fd = mFields[j];
+            
+            if (!fd.base)
+            {
+               AiMsgDebug("[volume_field3d] No data for field %s.%s[%lu]",
+                          fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex);
+               continue;
+            }
+            
+            for (size_t k=0; k<indices.size(); ++k)
+            {
+               FieldData &vfd = mFields[indices[k]];
+               
+               if (!vfd.base)
+               {
+                  AiMsgDebug("[volume_field3d] No data for field %s.%s[%lu]",
+                             vfd.partition.c_str(), vfd.name.c_str(), vfd.partitionIndex);
+                  continue;
+               }
+               
+               // require velocity field to have same resolution (data window) and mapping
+               if (fd.base->dataWindow() == vfd.base->dataWindow() &&
+                   fd.base->mapping()->isIdentical(vfd.base->mapping()))
+               {
+                  if (mVerbose)
+                  {
+                     AiMsgInfo("[volume_field3d] Set velocity field %lu for %s.%s[%lu] to %s.%s[%lu]",
+                               i, fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex,
+                               vfd.partition.c_str(), vfd.name.c_str(), vfd.partitionIndex);
+                  }
+                  fd.velocityField[i] = &vfd;
+                  break;
+               }
+            }
+         }
       }
    }
    
@@ -1350,6 +1435,8 @@ public:
             std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
             std::swap(mVelocityFields, tmp.mVelocityFields);
             
+            setupVelocityFields();
+            
             rv = true;
          }
          else
@@ -1373,6 +1460,8 @@ public:
                std::swap(mChannelsMergeType, tmp.mChannelsMergeType);
                std::swap(mFieldIndices, tmp.mFieldIndices);
                std::swap(mFields, tmp.mFields);
+               
+               setupVelocityFields();
                
                rv = true;
             }
