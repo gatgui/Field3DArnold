@@ -1855,31 +1855,12 @@ public:
                AiMsgDebug("[volume_field3d] Sample field %s.%s[%lu]", fd.partition.c_str(), fd.name.c_str(), fd.partitionIndex);
                #endif
                
-               // check if inside nox
+               // field world space shading point (== arnold object space point)
                Field3D::V3d Pw(sg->Po.x, sg->Po.y, sg->Po.z);
+               // field local space shading point
                Field3D::V3d Pl;
+               // field voxel space shading point
                Field3D::V3d Pv;
-               
-               if (!ignoreMb)
-               {
-                  // Get velocity
-                  // 
-                  // using:
-                  //   same partition name
-                  //   velocity field name
-                  //   same partition index
-                  // mVelocityFields
-                  if (nvf == 1)
-                  {
-                     // read a single VECTOR field
-                  }
-                  else
-                  {
-                     // read 3 FLOAT fields: X, Y, Z
-                  }
-                  
-                  // in which space is velocity expressed? which units?
-               }
                
                if (mIgnoreTransform)
                {
@@ -1894,6 +1875,82 @@ public:
                
                if (unitCube.intersects(Pl))
                {
+                  if (!ignoreMb)
+                  {
+                     Field3D::V3d V(0, 0, 0);
+                     Field3D::V3d Pd;
+                     
+                     AtByte vtype = AI_TYPE_UNDEFINED;
+                     AtParamValue vvalue;
+                     
+                     if (nvf == 1)
+                     {
+                        if (!fd.velocityField[0] || !fd.velocityField[0]->isVector)
+                        {
+                           AiMsgWarning("[volume_field3d] Cannot use specified velocity vector field");
+                        }
+                        else
+                        {
+                           // read a single VECTOR field
+                           if (fd.velocityField[0]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_VECTOR)
+                           {
+                              V.x = vscl * vvalue.VEC.x;
+                              V.y = vscl * vvalue.VEC.y;
+                              V.z = vscl * vvalue.VEC.z;
+                           }
+                           else
+                           {
+                              AiMsgWarning("[volume_field3d] Could not sample velocity vector field");
+                           }
+                        }
+                     }
+                     else
+                     {
+                        if (!fd.velocityField[0] || fd.velocityField[0]->isVector ||
+                            !fd.velocityField[1] || fd.velocityField[1]->isVector ||
+                            !fd.velocityField[2] || fd.velocityField[2]->isVector)
+                        {
+                           AiMsgWarning("[volume_field3d] Cannot use specified velocity scalar fields");
+                        }
+                        else
+                        {
+                           if (fd.velocityField[0]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
+                           {
+                              V.x = vscl * vvalue.FLT;
+                           }
+                           else
+                           {
+                              AiMsgWarning("[volume_field3d] Could not sample velocity X scalar field");
+                           }
+                           if (fd.velocityField[1]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
+                           {
+                              V.y = vscl * vvalue.FLT;
+                           }
+                           else
+                           {
+                              AiMsgWarning("[volume_field3d] Could not sample velocity Y scalar field");
+                           }
+                           if (fd.velocityField[2]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
+                           {
+                              V.z = vscl * vvalue.FLT;
+                           }
+                           else
+                           {
+                              AiMsgWarning("[volume_field3d] Could not sample velocity Z scalar field");
+                           }
+                        }
+                     }
+                     
+                     // Compute displaced shading point and only use it if inside volume
+                     Pd = Pl + V;
+                     
+                     if (unitCube.intersects(Pd))
+                     {
+                        Pl = Pd;
+                        fd.base->mapping()->localToVoxel(Pd, Pv);
+                     }
+                  }
+                  
                   mtit = mChannelsMergeType.find(fd.name);
                   mergeType = (mtit != mChannelsMergeType.end() ? mtit->second : SMT_add);
                   
