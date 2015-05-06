@@ -635,6 +635,7 @@ public:
       , mFrame(1.0f)
       , mFPS(24.0f)
       , mVelocityScale(1.0f)
+      , mPreTransformedVelocity(false)
       , mMotionStartFrame(1.0f)
       , mMotionEndFrame(1.0f)
       , mShutterTimeType(STT_normalized)
@@ -656,6 +657,7 @@ public:
       mFrame = 1.0f;
       mFPS = 24.0f;
       mVelocityScale = 1.0f;
+      mPreTransformedVelocity = false;
       mMotionStartFrame = mFrame;
       mMotionEndFrame = mFrame;
       mShutterTimeType = STT_normalized;
@@ -690,6 +692,7 @@ public:
       //   mFPS
       //   mVelocityFields
       //   mVelocityScale
+      //   mPreTransformedVelocity
       //   mMotionStartFrame
       //   mMotionEndFrame
       //   mShutterTimeType
@@ -859,6 +862,10 @@ public:
                }
             }
          }
+         else if (arg == "-preTransformedVelocity")
+         {
+            mPreTransformedVelocity = true;
+         }
          else if (arg == "-motionStartFrame")
          {
             if (++i >= args.size())
@@ -1016,6 +1023,10 @@ public:
             AiMsgWarning("[volume_field3d] Invalid value for shutterTimeType attribute. Should be one of 'normalized', 'frame_relative' or 'absolute_frame'");
          }
       }
+      if (readBoolUserAttr(node, "preTransformedVelocity", mPreTransformedVelocity))
+      {
+         AiMsgDebug("[voluem_field3d] User attribute 'preTransformedVelocity' found. '-preTransformedVelocity' flag overridden");
+      }
       if (readBoolUserAttr(node, "ignoreXform", mIgnoreTransform))
       {
          AiMsgDebug("[volume_field3d] User attribute 'ignoreXform' found. '-ignoreXform' flag overridden");
@@ -1056,6 +1067,7 @@ public:
          AiMsgDebug("[volume_field3d]   velocity field %lu = '%s'", i, mVelocityFields[i].c_str());
       }
       AiMsgDebug("[volume_field3d]   velocity scale = %f", mVelocityScale);
+      AiMsgDebug("[volume_field3d]   pre transformed velocity = %s", mPreTransformedVelocity ? "true" : "false");
       AiMsgDebug("[volume_field3d]   motion start frame = %f", mMotionStartFrame);
       AiMsgDebug("[volume_field3d]   motion end frame = %f", mMotionEndFrame);
       AiMsgDebug("[volume_field3d]   shutter time type = %s", ShutterTimeTypeToString(mShutterTimeType));
@@ -1429,6 +1441,7 @@ public:
             mFrame = tmp.mFrame;
             mFPS = tmp.mFPS;
             mVelocityScale = tmp.mVelocityScale;
+            mPreTransformedVelocity = tmp.mPreTransformedVelocity;
             mMotionStartFrame = tmp.mMotionStartFrame;
             mMotionEndFrame = tmp.mMotionEndFrame;
             mShutterTimeType = tmp.mShutterTimeType;
@@ -1452,6 +1465,7 @@ public:
                std::swap(mFrame, tmp.mFrame);
                std::swap(mFPS, tmp.mFPS);
                std::swap(mVelocityScale, tmp.mVelocityScale);
+               std::swap(mPreTransformedVelocity, tmp.mPreTransformedVelocity);
                std::swap(mMotionStartFrame, tmp.mMotionStartFrame);
                std::swap(mMotionEndFrame, tmp.mMotionEndFrame);
                std::swap(mShutterTimeType, tmp.mShutterTimeType);
@@ -1878,7 +1892,6 @@ public:
                   if (!ignoreMb)
                   {
                      Field3D::V3d V(0, 0, 0);
-                     Field3D::V3d Pd;
                      
                      AtByte vtype = AI_TYPE_UNDEFINED;
                      AtParamValue vvalue;
@@ -1894,9 +1907,9 @@ public:
                            // read a single VECTOR field
                            if (fd.velocityField[0]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_VECTOR)
                            {
-                              V.x = vscl * vvalue.VEC.x;
-                              V.y = vscl * vvalue.VEC.y;
-                              V.z = vscl * vvalue.VEC.z;
+                              V.x = vvalue.VEC.x;
+                              V.y = vvalue.VEC.y;
+                              V.z = vvalue.VEC.z;
                            }
                            else
                            {
@@ -1916,7 +1929,7 @@ public:
                         {
                            if (fd.velocityField[0]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
                            {
-                              V.x = vscl * vvalue.FLT;
+                              V.x = vvalue.FLT;
                            }
                            else
                            {
@@ -1924,7 +1937,7 @@ public:
                            }
                            if (fd.velocityField[1]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
                            {
-                              V.y = vscl * vvalue.FLT;
+                              V.y = vvalue.FLT;
                            }
                            else
                            {
@@ -1932,7 +1945,7 @@ public:
                            }
                            if (fd.velocityField[2]->sample(Pv, interp, SMT_average, &vvalue, &vtype) && vtype == AI_TYPE_FLOAT)
                            {
-                              V.z = vscl * vvalue.FLT;
+                              V.z = vvalue.FLT;
                            }
                            else
                            {
@@ -1942,13 +1955,29 @@ public:
                      }
                      
                      // Compute displaced shading point and only use it if inside volume
-                     Pd = Pl + V;
+                     #ifdef _DEBUG
+                     AiMsgDebug("[volume_field3d] Velocity = %lf, %lf, %lf", V.x, V.y, V.z);
+                     #endif
                      
-                     if (unitCube.intersects(Pd))
+                     if (mPreTransformedVelocity)
                      {
-                        Pl = Pd;
-                        fd.base->mapping()->localToVoxel(Pd, Pv);
+                        Field3D::V3d P0(0, 0, 0);
+                        Field3D::V3d P1(V);
+                        
+                        fd.base->mapping()->worldToLocal(P1, V);
+                        fd.base->mapping()->worldToLocal(P0, P1);
+                        
+                        V -= P1;
+                        
+                        #ifdef _DEBUG
+                        AiMsgDebug("[volume_field3d] => Velocity = %lf, %lf, %lf", V.x, V.y, V.z);
+                        #endif
                      }
+                     
+                     Pl = Pl + double(vscl) * V;
+                     // What if new Pl is not inside volume anymore?
+                     
+                     fd.base->mapping()->localToVoxel(Pl, Pv);
                   }
                   
                   mtit = mChannelsMergeType.find(fd.name);
@@ -1997,27 +2026,32 @@ public:
 
 private:
    
-   float secondsFromFrame(float shutterTime)
+   float shutterFrame(float shutterTime)
    {
-      float shutterFrame = mFrame;
+      float sf = mFrame;
       
       if (mShutterTimeType == STT_normalized)
       {
          if (mMotionEndFrame > mMotionStartFrame)
          {
-            shutterFrame = mMotionStartFrame + shutterTime * (mMotionEndFrame - mMotionStartFrame);
+            sf = mFrame + mMotionStartFrame + shutterTime * (mMotionEndFrame - mMotionStartFrame);
          }
       }
       else if (mShutterTimeType == STT_frame_relative)
       {
-         shutterFrame = mFrame + shutterTime;
+         sf = mFrame + shutterTime;
       }
       else if (mShutterTimeType == STT_absolute_frame)
       {
-         shutterFrame = shutterTime;
+         sf = shutterTime;
       }
       
-      return (shutterFrame - mFrame) / mFPS;
+      return sf;
+   }
+   
+   float secondsFromFrame(float shutterTime)
+   {
+      return (shutterFrame(shutterTime) - mFrame) / mFPS;
    }
    
    template <typename DataType>
@@ -2352,6 +2386,7 @@ private:
    float mFPS;
    std::vector<std::string> mVelocityFields;
    float mVelocityScale;
+   bool mPreTransformedVelocity;
    float mMotionStartFrame; // relative to mFrame
    float mMotionEndFrame; // relative to mFrame
    ShutterTimeType mShutterTimeType;

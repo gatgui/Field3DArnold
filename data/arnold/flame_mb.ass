@@ -241,7 +241,7 @@ volume
 {
  name ArnoldVolumeShape
  dso "/Users/gatgui/Dev/git/Field3DArnold/release/x64/arnold-4.2.6.1/volume_field3d.dylib"
- data "-file /Users/gatgui/Dev/git/Field3DArnold/data/f3d/FlameShapeFrame#.f3d -fps 24 -frame 32 -verbose"
+ data "-file /Users/gatgui/Dev/git/Field3DArnold/data/f3d/FlameShapeFrame#.f3d -frame 32 -verbose"
  min 0 0 0
  max 0 0 0
  step_size 0
@@ -270,10 +270,19 @@ volume
  mtoa_shading_groups "aiStandard1SG"
  
  declare velocityScale constant FLOAT
- velocityScale 0.0041
+ velocityScale 1.0
+ 
+ declare preTransformedVelocity constant BOOL
+ preTransformedVelocity on
  
  declare velocityField constant STRING
  velocityField "velocity"
+ 
+ declare frame constant FLOAT
+ frame 32
+ 
+ declare fps constant FLOAT
+ fps 24.0
  
  declare motionStartFrame constant FLOAT
  motionStartFrame -0.25
