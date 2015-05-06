@@ -1975,7 +1975,14 @@ public:
                      }
                      
                      Pl = Pl + double(vscl) * V;
+                     
                      // What if new Pl is not inside volume anymore?
+                     // - Clamp to unit cube?
+                     // - Project back using reversed velocity?
+                     // 
+                     //Pl.x = std::min(std::max(0.0, Pl.x), 1.0);
+                     //Pl.y = std::min(std::max(0.0, Pl.y), 1.0);
+                     //Pl.z = std::min(std::max(0.0, Pl.z), 1.0);
                      
                      fd.base->mapping()->localToVoxel(Pl, Pv);
                   }
