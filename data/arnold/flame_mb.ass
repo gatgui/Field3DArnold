@@ -272,8 +272,8 @@ volume
  declare velocityScale constant FLOAT
  velocityScale 1.0
  
- declare preTransformedVelocity constant BOOL
- preTransformedVelocity on
+ declare worldSpaceVelocity constant BOOL
+ worldSpaceVelocity on
  
  declare velocityField constant STRING
  velocityField "velocity"

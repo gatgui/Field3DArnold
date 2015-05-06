@@ -222,7 +222,7 @@ createNode aiVolume -n "ArnoldVolumeShape" -p "ArnoldVolume";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
 	setAttr ".dso" -type "string" "/Users/gatgui/Dev/git/Field3DArnold/release/x64/arnold-4.2.6.1/volume_field3d.dylib";
-	setAttr ".data" -type "string" "-file /Users/gatgui/Dev/git/Field3DArnold/data/f3d/FlameShapeFrame#.f3d -motionStartFrame -0.25 -motionEndFrame 0.25 -velocityField velocity -preTransformedVelocity";
+	setAttr ".data" -type "string" "-file /Users/gatgui/Dev/git/Field3DArnold/data/f3d/FlameShapeFrame#.f3d -motionStartFrame -0.25 -motionEndFrame 0.25 -velocityField velocity -worldSpaceVelocity";
 createNode transform -n "aiSkyDomeLight1";
 createNode aiSkyDomeLight -n "aiSkyDomeLightShape1" -p "aiSkyDomeLight1";
 	setAttr -k off ".v";
