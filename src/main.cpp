@@ -1499,9 +1499,7 @@ public:
       
       bbox.makeEmpty();
       
-      autoStep = 0.0f;
-      
-      float autoStepNormalize = 0.0;
+      autoStep = std::numeric_limits<float>::max();
       
       for (size_t i=0; i<mFields.size(); ++i)
       {
@@ -1516,9 +1514,9 @@ public:
          
          Field3D::V3d bmin(0.0, 0.0, 0.0);
          Field3D::V3d bmax(1.0, 1.0, 1.0);
-         Field3D::V3d lstep(0.5 / double(res.x),
-                            0.5 / double(res.y),
-                            0.5 / double(res.z));
+         Field3D::V3d lstep(1.0 / double(res.x),
+                            1.0 / double(res.y),
+                            1.0 / double(res.z));
          Field3D::V3d step;
          Field3D::Box3d b;
          
@@ -1554,8 +1552,10 @@ public:
             s = float(step.z);
          }
          
-         autoStep += s;
-         autoStepNormalize += 1.0f;
+         if (s < autoStep)
+         {
+            autoStep = s;
+         }
          
          bbox.extendBy(b);
       }
@@ -1568,8 +1568,6 @@ public:
          outBox.max.x = float(bbox.max.x);
          outBox.max.y = float(bbox.max.y);
          outBox.max.z = float(bbox.max.z);
-         
-         autoStep /= autoStepNormalize;
       }
       else
       {
