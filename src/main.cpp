@@ -635,7 +635,7 @@ public:
       , mFrame(1.0f)
       , mFPS(24.0f)
       , mVelocityScale(1.0f)
-      , mPreTransformedVelocity(false)
+      , mWorldSpaceVelocity(false)
       , mMotionStartFrame(1.0f)
       , mMotionEndFrame(1.0f)
       , mShutterTimeType(STT_normalized)
@@ -657,7 +657,7 @@ public:
       mFrame = 1.0f;
       mFPS = 24.0f;
       mVelocityScale = 1.0f;
-      mPreTransformedVelocity = false;
+      mWorldSpaceVelocity = false;
       mMotionStartFrame = mFrame;
       mMotionEndFrame = mFrame;
       mShutterTimeType = STT_normalized;
@@ -692,7 +692,7 @@ public:
       //   mFPS
       //   mVelocityFields
       //   mVelocityScale
-      //   mPreTransformedVelocity
+      //   mWorldSpaceVelocity
       //   mMotionStartFrame
       //   mMotionEndFrame
       //   mShutterTimeType
@@ -862,9 +862,9 @@ public:
                }
             }
          }
-         else if (arg == "-preTransformedVelocity")
+         else if (arg == "-worldSpaceVelocity")
          {
-            mPreTransformedVelocity = true;
+            mWorldSpaceVelocity = true;
          }
          else if (arg == "-motionStartFrame")
          {
@@ -1023,9 +1023,9 @@ public:
             AiMsgWarning("[volume_field3d] Invalid value for shutterTimeType attribute. Should be one of 'normalized', 'frame_relative' or 'absolute_frame'");
          }
       }
-      if (readBoolUserAttr(node, "preTransformedVelocity", mPreTransformedVelocity))
+      if (readBoolUserAttr(node, "worldSpaceVelocity", mWorldSpaceVelocity))
       {
-         AiMsgDebug("[voluem_field3d] User attribute 'preTransformedVelocity' found. '-preTransformedVelocity' flag overridden");
+         AiMsgDebug("[voluem_field3d] User attribute 'worldSpaceVelocity' found. '-worldSpaceVelocity' flag overridden");
       }
       if (readBoolUserAttr(node, "ignoreXform", mIgnoreTransform))
       {
@@ -1067,7 +1067,7 @@ public:
          AiMsgDebug("[volume_field3d]   velocity field %lu = '%s'", i, mVelocityFields[i].c_str());
       }
       AiMsgDebug("[volume_field3d]   velocity scale = %f", mVelocityScale);
-      AiMsgDebug("[volume_field3d]   pre transformed velocity = %s", mPreTransformedVelocity ? "true" : "false");
+      AiMsgDebug("[volume_field3d]   pre transformed velocity = %s", mWorldSpaceVelocity ? "true" : "false");
       AiMsgDebug("[volume_field3d]   motion start frame = %f", mMotionStartFrame);
       AiMsgDebug("[volume_field3d]   motion end frame = %f", mMotionEndFrame);
       AiMsgDebug("[volume_field3d]   shutter time type = %s", ShutterTimeTypeToString(mShutterTimeType));
@@ -1441,7 +1441,7 @@ public:
             mFrame = tmp.mFrame;
             mFPS = tmp.mFPS;
             mVelocityScale = tmp.mVelocityScale;
-            mPreTransformedVelocity = tmp.mPreTransformedVelocity;
+            mWorldSpaceVelocity = tmp.mWorldSpaceVelocity;
             mMotionStartFrame = tmp.mMotionStartFrame;
             mMotionEndFrame = tmp.mMotionEndFrame;
             mShutterTimeType = tmp.mShutterTimeType;
@@ -1465,7 +1465,7 @@ public:
                std::swap(mFrame, tmp.mFrame);
                std::swap(mFPS, tmp.mFPS);
                std::swap(mVelocityScale, tmp.mVelocityScale);
-               std::swap(mPreTransformedVelocity, tmp.mPreTransformedVelocity);
+               std::swap(mWorldSpaceVelocity, tmp.mWorldSpaceVelocity);
                std::swap(mMotionStartFrame, tmp.mMotionStartFrame);
                std::swap(mMotionEndFrame, tmp.mMotionEndFrame);
                std::swap(mShutterTimeType, tmp.mShutterTimeType);
@@ -1957,7 +1957,7 @@ public:
                      AiMsgDebug("[volume_field3d] Velocity = %lf, %lf, %lf", V.x, V.y, V.z);
                      #endif
                      
-                     if (mPreTransformedVelocity)
+                     if (mWorldSpaceVelocity)
                      {
                         Field3D::V3d P0(0, 0, 0);
                         Field3D::V3d P1(V);
@@ -2266,9 +2266,28 @@ private:
    {
       const AtUserParamEntry *param = AiNodeLookUpUserParameter(node, paramName);
       
-      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT && AiUserParamGetType(param) == AI_TYPE_BOOLEAN)
+      if (param && AiUserParamGetCategory(param) == AI_USERDEF_CONSTANT)
       {
-         out = AiNodeGetBool(node, paramName);
+         int ptype = AiUserParamGetType(param);
+         
+         switch (ptype)
+         {
+         case AI_TYPE_BOOLEAN:
+            out = AiNodeGetBool(node, paramName);
+            break;
+         case AI_TYPE_BYTE:
+            out = (AiNodeGetByte(node, paramName) != 0);
+            break;
+         case AI_TYPE_INT:
+            out = (AiNodeGetInt(node, paramName) != 0);
+            break;
+         case AI_TYPE_UINT:
+            out = (AiNodeGetUInt(node, paramName) != 0);
+            break;
+         default:
+            return false;
+         }
+         
          return true;
       }
       else
@@ -2391,7 +2410,7 @@ private:
    float mFPS;
    std::vector<std::string> mVelocityFields;
    float mVelocityScale;
-   bool mPreTransformedVelocity;
+   bool mWorldSpaceVelocity;
    float mMotionStartFrame; // relative to mFrame
    float mMotionEndFrame; // relative to mFrame
    ShutterTimeType mShutterTimeType;
