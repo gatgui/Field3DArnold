@@ -113,6 +113,7 @@ static ShutterTimeType ShutterTimeTypeFromString(const std::string &s)
    }
 }
 
+#ifdef _DEBUG
 static const char* ShutterTimeTypeToString(ShutterTimeType t)
 {
    switch (t)
@@ -127,6 +128,7 @@ static const char* ShutterTimeTypeToString(ShutterTimeType t)
       return "";
    }
 }
+#endif
 
 
 template <typename ValueType> struct ArnoldType { enum { Value = AI_TYPE_UNDEFINED }; };
@@ -1832,7 +1834,7 @@ public:
       }
       
       std::map<std::string, SampleMergeType>::const_iterator mtit;
-      SampleMergeType mergeType;
+      SampleMergeType mergeType = SMT_add;
       Field3D::Box3d unitCube;
       
       unitCube.min = Field3D::V3d(0.0, 0.0, 0.0);
