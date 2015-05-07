@@ -55,7 +55,7 @@ Here is the list of accepted types for each of the parameters:
 
 - **file**: STRING
 - **partition**: STRING
-- **verboes**: BOOLEAN, BYTE, INT, UINT
+- **verbose**: BOOLEAN, BYTE, INT, UINT
 - **ignoreXform**: BOOLEAN, BYTE, INT, UINT
 - **frame**: FLOAT, INT, UINT, BYTE
 - **merge**: STRING, STRING[]
@@ -72,4 +72,10 @@ Use aiVolume node in 'Custom' mode and set the DSO path to volume_field3d
 
 Either set the data string or user maya custom attributes prefixing names described above with mtoa_constant_
 
+The sample script createArnoldF3dVolume should give you an idea how to set this up.
+
+There are a couple of issues though with aiVolume:
+
+- you must use a full path for the DSO if you want MtoA to be able to call it to retrieve the volume bounds automatically as it seems to ignore the procedural_searchpath
+- you must at least set the f3d file path in the data parameter (-file ...) as the user attributes are not properly read when MtoA is calling the procedural to compute the bounds
 

@@ -113,7 +113,6 @@ static ShutterTimeType ShutterTimeTypeFromString(const std::string &s)
    }
 }
 
-#ifdef _DEBUG
 static const char* ShutterTimeTypeToString(ShutterTimeType t)
 {
    switch (t)
@@ -128,7 +127,6 @@ static const char* ShutterTimeTypeToString(ShutterTimeType t)
       return "";
    }
 }
-#endif
 
 
 template <typename ValueType> struct ArnoldType { enum { Value = AI_TYPE_UNDEFINED }; };
@@ -1058,29 +1056,6 @@ public:
          }
       }
       
-      #ifdef _DEBUG
-      AiMsgDebug("[volume_field3d] Parameters:");
-      AiMsgDebug("[volume_field3d]   path = '%s'", mPath.c_str());
-      AiMsgDebug("[volume_field3d]   partition = '%s'", mPartition.c_str());
-      AiMsgDebug("[volume_field3d]   frame = %f", mFrame);
-      AiMsgDebug("[volume_field3d]   fps = %f", mFPS);
-      for (size_t i=0; i<mVelocityFields.size(); ++i)
-      {
-         AiMsgDebug("[volume_field3d]   velocity field %lu = '%s'", i, mVelocityFields[i].c_str());
-      }
-      AiMsgDebug("[volume_field3d]   velocity scale = %f", mVelocityScale);
-      AiMsgDebug("[volume_field3d]   pre transformed velocity = %s", mWorldSpaceVelocity ? "true" : "false");
-      AiMsgDebug("[volume_field3d]   motion start frame = %f", mMotionStartFrame);
-      AiMsgDebug("[volume_field3d]   motion end frame = %f", mMotionEndFrame);
-      AiMsgDebug("[volume_field3d]   shutter time type = %s", ShutterTimeTypeToString(mShutterTimeType));
-      for (std::map<std::string, SampleMergeType>::iterator mtit=mChannelsMergeType.begin(); mtit!=mChannelsMergeType.end(); ++mtit)
-      {
-         AiMsgDebug("[volume_field3d]   '%s' channel merge = %s", mtit->first.c_str(), SampleMergeTypeToString(mtit->second));
-      }
-      AiMsgDebug("[volume_field3d]   ignore transform = %s", mIgnoreTransform ? "true" : "false");
-      AiMsgDebug("[volume_field3d]   verbose = %s", mVerbose ? "true" : "false");
-      #endif
-      
       // setup motion start/end
       if (!hasMotionStart)
       {
@@ -1098,6 +1073,29 @@ public:
       if (mFPS < AI_EPSILON)
       {
          mFPS = AI_EPSILON;
+      }
+      
+      if (mVerbose && !noSetup)
+      {
+         AiMsgInfo("[volume_field3d] Parameters:");
+         AiMsgInfo("[volume_field3d]   path = '%s'", mPath.c_str());
+         AiMsgInfo("[volume_field3d]   partition = '%s'", mPartition.c_str());
+         AiMsgInfo("[volume_field3d]   frame = %f", mFrame);
+         AiMsgInfo("[volume_field3d]   fps = %f", mFPS);
+         for (size_t i=0; i<mVelocityFields.size(); ++i)
+         {
+            AiMsgInfo("[volume_field3d]   velocity field %lu = '%s'", i, mVelocityFields[i].c_str());
+         }
+         AiMsgInfo("[volume_field3d]   velocity scale = %f", mVelocityScale);
+         AiMsgInfo("[volume_field3d]   world space velocity = %s", mWorldSpaceVelocity ? "true" : "false");
+         AiMsgInfo("[volume_field3d]   motion start frame = %f", mMotionStartFrame);
+         AiMsgInfo("[volume_field3d]   motion end frame = %f", mMotionEndFrame);
+         AiMsgInfo("[volume_field3d]   shutter time type = %s", ShutterTimeTypeToString(mShutterTimeType));
+         for (std::map<std::string, SampleMergeType>::iterator mtit=mChannelsMergeType.begin(); mtit!=mChannelsMergeType.end(); ++mtit)
+         {
+            AiMsgInfo("[volume_field3d]   '%s' channel merge = %s", mtit->first.c_str(), SampleMergeTypeToString(mtit->second));
+         }
+         AiMsgInfo("[volume_field3d]   ignore transform = %s", mIgnoreTransform ? "true" : "false");
       }
       
       // Replace frame in path (if necessary)
@@ -1211,7 +1209,7 @@ public:
       }
       mPath += basename;
       
-      if (mVerbose)
+      if (mVerbose && !noSetup)
       {
          AiMsgInfo("[volume_field3d] Using %s", mPath.c_str());
       }
@@ -2191,7 +2189,14 @@ private:
       std::string tmp;
       std::string part;
       bool inquotes = false;
+      
       size_t p0 = in.find_first_not_of(sSplitChars);
+      
+      if (p0 == std::string::npos)
+      {
+         return 0;
+      }
+      
       size_t p1 = in.find_first_of(sSplitChars, p0);
       size_t p2;
       
@@ -2239,25 +2244,28 @@ private:
          p1 = in.find_first_of(sSplitChars, p0);
       }
       
-      tmp = in.substr(p0);
-      
-      if (tmp.length() > 0)
+      if (p0 != std::string::npos)
       {
-         if (inquotes)
+         tmp = in.substr(p0);
+         
+         if (tmp.length() > 0)
          {
-            if (tmp[tmp.length()-1] != '"')
+            if (inquotes)
             {
-               AiMsgWarning("[volume_field3d] Unterminated string argument");
-               out.push_back(part + tmp);
+               if (tmp[tmp.length()-1] != '"')
+               {
+                  AiMsgWarning("[volume_field3d] Unterminated string argument");
+                  out.push_back(part + tmp);
+               }
+               else
+               {
+                  out.push_back(part + tmp.substr(0, tmp.length() - 1));
+               }
             }
             else
             {
-               out.push_back(part + tmp.substr(0, tmp.length() - 1));
+               out.push_back(tmp);
             }
-         }
-         else
-         {
-            out.push_back(tmp);
          }
       }
       

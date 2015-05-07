@@ -1,0 +1,29 @@
+
+global proc string createArnoldF3dVolume(string $path)
+{
+   string $n = `createNode aiVolume`;
+
+   setAttr ($n+".type") 0;
+   
+   addAttr -ln "mtoa_constant_file" -nn "F3d File" -dt "string" -usedAsFilename $n;
+   addAttr -ln "mtoa_constant_partition" -nn "F3d Partition" -dt "string" $n;
+   addAttr -ln "mtoa_constant_ignoreXform" -nn "F3d Ignore Xform" -at bool $n;
+   // MtoA doesn't recognize user attribute of type 'time'
+   addAttr -ln "mtoa_constant_frame" -nn "F3d Frame" -at "float" $n;
+   addAttr -ln "mtoa_constant_fps" -nn "F3d Fps" -at "float" -dv 24 $n;
+   addAttr -ln "mtoa_constant_velocityField" -nn "F3d Velocity Field" -dt "string" $n;
+   addAttr -ln "mtoa_constant_velocityScale" -nn "F3d Velocity Scale" -at "float" -dv 1 $n;
+   addAttr -ln "mtoa_constant_worldSpaceVelocity" -nn "F3d World Space Velocity" -at bool -dv 0 $n;
+   addAttr -ln "mtoa_constant_motionStartFrame" -nn "F3d Motion Start Frame" -at "float" -dv -0.25 $n;
+   addAttr -ln "mtoa_constant_motionEndFrame" -nn "F3d Motion End Frame" -at "float" -dv 0.25 $n;
+   addAttr -ln "mtoa_constant_shutterTimeType" -nn "F3d Shutter Time Type" -at enum -enumName "normalized:frame_relative:absolute_frame" -dv 0 $n;
+   addAttr -ln "mtoa_constant_merge" -nn "F3d Merge" -dt "string" $n;
+   addAttr -ln "mtoa_constant_verbose" -nn "F3d Verbose" -at bool $n;
+   
+   connectAttr time1.outTime ($n+".mtoa_constant_frame");
+   
+   setAttr -type "string" ($n+".mtoa_constant_file") $path;
+   setAttr -type "string" ($n+".dso") "volume_field3d";
+   
+   return $n;
+}
