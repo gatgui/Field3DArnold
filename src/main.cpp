@@ -1517,21 +1517,35 @@ public:
          Field3D::V3d lstep(1.0 / double(res.x),
                             1.0 / double(res.y),
                             1.0 / double(res.z));
-         Field3D::V3d step;
+         Field3D::V3d step, corner;
          Field3D::Box3d b;
          
          if (!mIgnoreTransform)
          {
-            fd.base->mapping()->localToWorld(bmin, b.min);
-            fd.base->mapping()->localToWorld(bmax, b.max);
+            fd.base->mapping()->localToWorld(bmax, corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(1.0, 1.0, 0.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(1.0, 0.0, 1.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(1.0, 0.0, 0.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(0.0, 1.0, 1.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(0.0, 1.0, 0.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(Field3D::V3d(0.0, 0.0, 1.0), corner);
+            b.extendBy(corner);
+            fd.base->mapping()->localToWorld(bmin, corner);
+            b.extendBy(corner);
             
-            // Note: b.min is the origin (0, 0, 0) in world space
-            //       localToWorld is transforming its input as a point, not a vector
+            // Notes: - corner is the origin (0, 0, 0) in world space
+            //        - localToWorld is transforming its input as a point, not a vector
             fd.base->mapping()->localToWorld(lstep, step);
             
-            step.x = fabs(step.x - b.min.x);
-            step.y = fabs(step.y - b.min.y);
-            step.z = fabs(step.z - b.min.z);
+            step.x = fabs(step.x - corner.x);
+            step.y = fabs(step.y - corner.y);
+            step.z = fabs(step.z - corner.z);
          }
          else
          {
